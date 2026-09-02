@@ -12,22 +12,20 @@ datasource db {
 // ==========================================
 
 model User {
-  id                  String             @id @default(cuid())
-  name                  String
-  email               String             @unique
-  emailVerified       Boolean            @default(false)
-  role                String?            @default("Learner")
-  imageUrl            String?
-  phoneNumber         String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  stripeCustomerId    String?            @unique
-  onboardingCompleted Boolean            @default(false)
-  status              UserStatus         @default(Active)
-  lastLoginAt         DateTime?
-  verificationStatus  VerificationStatus @default(Pending)
-
-  // Relations
+  id                   String               @id @default(cuid())
+  name                 String
+  email                String               @unique
+  emailVerified        Boolean              @default(false)
+  role                 String?              @default("Learner")
+  imageUrl             String?
+  phoneNumber          String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  stripeCustomerId     String?              @unique
+  onboardingCompleted  Boolean              @default(false)
+  status               UserStatus           @default(Active)
+  lastLoginAt          DateTime?
+  verificationStatus   VerificationStatus   @default(Pending)
   subscription         Subscription?
   facilitatorProfile   FacilitatorProfile?
   accounts             Account[]
@@ -46,6 +44,12 @@ model User {
   whitrboard           Whiteboard[]
   investments          Investment[]
   investmentAccounts   InvestmentAccount[]
+  videoGenerations     VideoGeneration[]
+  credits              UserCredit?
+  creditTransactions   CreditTransaction[]
+  aiProjects       AIProject[]
+  aiGenerations    AIGeneration[]
+  aiAssets         AIAsset[]
 
   @@map("user")
 }
@@ -144,58 +148,50 @@ model Verification {
 // ==========================================
 
 model PendingEnrollment {
-  id             String                  @id @default(cuid())
-  name           String
-  email          String
-  phoneNumber    String?
-  gradeLevel     String
-  subject        String
-  enrollmentType EnrollmentTrack
-  topic          String?                 @db.Text
-  sessionDate    DateTime
-  startTime      DateTime
-  endTime        DateTime
-  educatorId     String?
-  educator       User?                   @relation(fields: [educatorId], references: [id], onDelete: SetNull)
-  amount         Int                     // Stored in cents
-  stripeSessionId String?               @unique
-  status         PendingEnrollmentStatus @default(Pending)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id              String                  @id @default(cuid())
+  name            String
+  email           String
+  phoneNumber     String?
+  gradeLevel      String
+  subject         String
+  enrollmentType  EnrollmentTrack
+  topic           String?                 @db.Text
+  sessionDate     DateTime
+  startTime       DateTime
+  endTime         DateTime
+  educatorId      String?
+  educator        User?                   @relation(fields: [educatorId], references: [id], onDelete: SetNull)
+  amount          Int // Stored in cents
+  stripeSessionId String?                 @unique
+  status          PendingEnrollmentStatus @default(Pending)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   @@index([email])
   @@index([status])
 }
 
-model Subject {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
 model Appointment {
-  id                     String            @id @default(cuid())
-  learnerId              String
-  learner                User              @relation("LearnerAppointments", fields: [learnerId], references: [id], onDelete: Cascade)
-  educatorId             String
-  educator               User              @relation("EducatorAppointments", fields: [educatorId], references: [id], onDelete: Cascade)
-  subject                String
-  gradeLevel             String
-  date                   DateTime
-  startTime              DateTime
-  endTime                DateTime
-  learnerDescription     String?           @db.Text
-  status                 AppointmentStatus @default(Scheduled)
+  id                      String            @id @default(cuid())
+  learnerId               String
+  learner                 User              @relation("LearnerAppointments", fields: [learnerId], references: [id], onDelete: Cascade)
+  educatorId              String
+  educator                User              @relation("EducatorAppointments", fields: [educatorId], references: [id], onDelete: Cascade)
+  subject                 String
+  gradeLevel              String
+  date                    DateTime
+  startTime               DateTime
+  endTime                 DateTime
+  learnerDescription      String?           @db.Text
+  status                  AppointmentStatus @default(Scheduled)
   stripeCheckoutSessionId String?
-  paymentIntentId        String?
-  payoutStatus           PayoutStatus      @default(Unpaid)
-  videoSessionId         String?
-  videoSessionToken      String?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  whiteboard            Whiteboard?
+  paymentIntentId         String?
+  payoutStatus            PayoutStatus      @default(Unpaid)
+  videoSessionId          String?
+  videoSessionToken       String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  whiteboard              Whiteboard?
 
   @@index([status, startTime])
   @@index([educatorId, startTime])
@@ -210,36 +206,72 @@ model Product {
   id                 String               @id @default(cuid())
   title              String
   description        String               @db.Text
-  price              Int                  // Stored in cents
-  printedPrice       Int?
-  stripePriceId      String?              @unique
   slug               String               @unique
-  userId             String
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gradeLevel         GradeLevel
+  subjectId          String
+  subject            Subject              @relation(fields: [subjectId], references: [id])
+  topicId            String
+  topic              Topic                @relation(fields: [topicId], references: [id])
   type               ProductType
-  status             ProductStatus        @default(Draft)
-
-  // Course-specific fields (Optional - used if type is Course)
+  accessModel        ProductAccessModel   @default(INDIVIDUAL)
+  price              Int? // Stored in cents
+  printedPrice       Int?
   duration           Int?
-  adminFeedback      String?              @db.Text
   category           String?
-  imageKey           String?              // Course thumbnail image key
-
-  // Digital Product-specific fields (Optional - used if type is DigitalProduct)
+  imageKey           String? // Course thumbnail image key
+  status             ProductStatus        @default(Draft)
   fileKey            String?
   fileType           String?
   fileSize           Int?
   downloadCount      Int                  @default(0)
-
-  // Relations
+  stripePriceId      String?              @unique
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   chapters           Chapter[]
   enrollments        Enrollment[]
   enrollmentProgress EnrollmentProgress[]
-  images             ProductImage[] 
   purchases          Purchase[]
 
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gradeLevel])
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([gradeLevel, subjectId, topicId])
+  @@index([gradeLevel, subjectId, topicId, type])
+}
+
+model Subject {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?
+  topics           Topic[]
+  products         Product[]
+  videoGenerations VideoGeneration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+}
+
+model Topic {
+  id         String     @id @default(cuid())
+  name       String
+  slug       String
+  gradeLevel GradeLevel
+  subjectId  String
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  products   Product[]
+
+  videoGenerations VideoGeneration[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([subjectId, gradeLevel, slug])
+  @@index([gradeLevel, subjectId])
+  @@index([gradeLevel, subjectId, slug])
 }
 
 model Chapter {
@@ -271,17 +303,6 @@ model Lesson {
   @@index([chapterId])
 }
 
-model ProductImage {
-  id        String   @id @default(cuid())
-  imageKey  String
-  position  Int      @default(0)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@index([productId])
-}
-
 model Purchase {
   id                    String   @id @default(cuid())
   userId                String
@@ -303,7 +324,7 @@ model Purchase {
 
 model Enrollment {
   id        String           @id @default(cuid())
-  amount    Int              // Stored in cents
+  amount    Int // Stored in cents
   status    EnrollmentStatus @default(Pending)
   productId String
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -364,9 +385,9 @@ model Payout {
   id          String       @id @default(cuid())
   educatorId  String
   educator    User         @relation(fields: [educatorId], references: [id], onDelete: Cascade)
-  amount      Int          // Stored in cents
-  platformFee Int          // Stored in cents
-  netAmount   Int          // Stored in cents
+  amount      Int // Stored in cents
+  platformFee Int // Stored in cents
+  netAmount   Int // Stored in cents
   paypalEmail String
   status      PayoutStatus @default(Processing)
   processedBy String?
@@ -382,7 +403,7 @@ model Transaction {
   id                    String            @id @default(cuid())
   userId                String?
   user                  User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  amount                Int               // Stored in cents
+  amount                Int // Stored in cents
   stripeSessionId       String?
   stripePaymentIntentId String?
   status                TransactionStatus @default(Pending)
@@ -397,37 +418,35 @@ model Transaction {
 // ==========================================
 
 model InvestmentAccount {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   userId        String
-  institution   String   @default("Fidelity Investments")
+  institution   String       @default("Fidelity Investments")
   accountNumber String
   accountName   String?
   accountType   String?
   currency      CurrencyType @default(USD)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  investments  Investment[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  investments Investment[]
 
   @@unique([userId, institution, accountNumber])
   @@index([userId])
 }
 
 model Investment {
-  id                    String   @id @default(cuid())
+  id                    String                    @id @default(cuid())
   userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId             String?
-  investmentAccount     InvestmentAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-
+  investmentAccount     InvestmentAccount?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
   name                  String
   tickerOrSymbol        String?
   cusip                 String?
   accountNumber         String?
   accountName           String?
-  institution           String?  @default("Fidelity Investments")
+  institution           String?                   @default("Fidelity Investments")
   assetClass            AssetType
   region                RegionType
   currency              CurrencyType
@@ -436,26 +455,26 @@ model Investment {
   pricePerShare         Float?
   amount                Float
   grossAmount           Float?
-  fees                  Float    @default(0)
-  taxes                 Float    @default(0)
+  fees                  Float                     @default(0)
+  taxes                 Float                     @default(0)
   costBasis             Float?
   realizedGain          Float?
   marketValue           Float?
   unrealizedGain        Float?
   unrealizedGainPercent Float?
   cashBalance           Float?
-  exchangeRate          Float    @default(1)
+  exchangeRate          Float                     @default(1)
   amountUSD             Float
   date                  DateTime
   settlementDate        DateTime?
   source                String?
   sourceFile            String?
   importBatchId         String?
-  fingerprint           String? @unique
+  fingerprint           String?                   @unique
   status                StatusType
   notes                 String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
 
   @@index([userId, date])
   @@index([userId, tickerOrSymbol])
@@ -475,30 +494,179 @@ model Whiteboard {
   updatedAt     DateTime     @updatedAt
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([userId, isStandalone])
 }
 
 model SiteVisitor {
-  id        String   @id @default(cuid())
-  visitorId String   @unique
-  firstSeen DateTime @default(now())
-  lastSeen  DateTime @default(now())
-  pageViews Int      @default(0)
+  id               String         @id @default(cuid())
+  visitorId        String         @unique
+  firstSeen        DateTime       @default(now())
+  lastSeen         DateTime       @default(now())
+  pageViews        Int            @default(0)
   pageViewsRecords SitePageView[]
+
   @@index([lastSeen])
   @@index([firstSeen])
 }
 
 model SitePageView {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   visitorId String
   path      String
-  createdAt DateTime @default(now())
-  visitor SiteVisitor @relation(fields: [visitorId],references: [visitorId],onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  visitor   SiteVisitor @relation(fields: [visitorId], references: [visitorId], onDelete: Cascade)
+
   @@index([visitorId])
   @@index([createdAt])
   @@index([path])
+}
+
+// ==========================================
+// AI VIDEO GENERATION
+// ==========================================
+
+model VideoGeneration {
+  id                 String                @id @default(cuid())
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId          String?
+  subject            Subject?              @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  topicId            String?
+  topic              Topic?                @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  gradeLevel         GradeLevel?
+  title              String?
+  prompt             String                @db.Text
+  style              String?
+  duration           Int
+  aspectRatio        String                @default("16:9")
+  provider           String
+  model              String?
+  providerTaskId     String?
+  status             VideoGenerationStatus @default(PENDING)
+  videoUrl           String?               @db.Text
+  thumbnailUrl       String?               @db.Text
+  creditsUsed        Int                   @default(0)
+  errorMessage       String?               @db.Text
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  completedAt        DateTime?
+  creditTransactions CreditTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([providerTaskId])
+  @@index([subjectId])
+  @@index([topicId])
+}
+
+model UserCredit {
+  id           String              @id @default(cuid())
+  userId       String              @unique
+  balance      Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+}
+
+model CreditTransaction {
+  id           String                @id @default(cuid())
+  userId       String
+  userCreditId String
+  amount       Int
+  type         CreditTransactionType
+  description  String?
+  generationId String?
+  aiGenerationId String?
+  createdAt    DateTime              @default(now())
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userCredit   UserCredit            @relation(fields: [userCreditId], references: [id], onDelete: Cascade)
+  generation   VideoGeneration?      @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  aiGeneration AIGeneration?         @relation(fields: [aiGenerationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userCreditId])
+  @@index([generationId])
+  @@index([aiGenerationId])
+  @@index([createdAt])
+}
+
+model AIGeneration {
+  id             String              @id @default(cuid())
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        AIProject?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  type           AIGenerationType
+  status         AIGenerationStatus  @default(PENDING)
+  prompt         String              @db.Text
+  inputData      Json?
+  outputData     Json?
+  provider       String?
+  model          String?
+  providerTaskId String?
+  creditsUsed    Int                 @default(0)
+  errorMessage   String?             @db.Text
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  assets         AIAsset[]
+  creditTransactions CreditTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@index([status])
+  @@index([providerTaskId])
+}
+
+model AIProject {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?       @db.Text
+  type        AIProjectType @default(GENERAL)
+  status      AIProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  generations AIGeneration[]
+  assets      AIAsset[]
+
+  @@index([userId, updatedAt])
+}
+
+model AIAsset {
+  id            String        @id @default(cuid())
+
+  userId        String
+  projectId     String?
+  generationId  String?
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       AIProject?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  generation    AIGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
+
+  type          AIAssetType
+  name          String
+
+  fileKey       String?
+  url           String?       @db.Text
+  thumbnailUrl  String?       @db.Text
+
+  mimeType      String?
+  fileSize      Int?
+
+  metadata      Json?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@index([generationId])
 }
 
 // ==========================================
@@ -520,6 +688,14 @@ enum InvestmentTransactionType {
   CASH
   HOLDING_SNAPSHOT
   OTHER
+}
+
+enum VideoGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum UserStatus {
@@ -648,3 +824,87 @@ enum TransactionType {
   CASH
 }
 
+enum GradeLevel {
+  Grade1
+  Grade2
+  Grade3
+  Grade4
+  Grade5
+  Grade6
+  Grade7
+  Grade8
+  Grade9
+  Grade10
+  Grade11
+  Grade12
+}
+
+enum ProductAccessModel {
+  INDIVIDUAL
+  SUBSCRIPTION
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  GRANT
+  GENERATION
+  REFUND
+  ADJUSTMENT
+}
+
+enum AIGenerationType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  WORKSHEET
+  WORKBOOK
+  QUIZ
+  LESSON_PLAN
+  PRESENTATION
+  STORY
+  THUMBNAIL
+}
+
+enum AIGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AIAssetType {
+  DOCUMENT
+  IMAGE
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+enum AIProjectType {
+  GENERAL
+  WORKSHEET
+  WORKBOOK
+  LESSON
+  QUIZ
+  VIDEO
+  STORY
+  PRESENTATION
+  YOUTUBE
+  JUSTDY_KIDZ
+}
+
+enum AIProjectStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+enum AIPlanType {
+  FREE
+  CREATOR
+  PRO
+  STUDIO
+  SCHOOL
+}

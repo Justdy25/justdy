@@ -15,13 +15,16 @@ import {
   GraduationCap,
   Library,
   Receipt,
+  BookOpen,
+  ListTree,
+  Video,
+  Sparkles,
 } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -33,7 +36,6 @@ import { authClient } from "@/lib/auth-client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { IconCash } from "@tabler/icons-react";
-import MyLogo from "../Logo";
 
 export interface NavItem {
   title: string;
@@ -53,41 +55,54 @@ const navigationData: Record<string, NavItem[]> = {
       roles: ["admin", "educator"],
     },
     {
-      title: "Consultation Leads",
-      url: "/manage/consultation-leads",
-      icon: Library,
-      roles: ["admin"],
+      title: "Justdy AI",
+      url: "/manage/ai",
+      icon: Sparkles,
+      roles: ["admin", "educator"],
     },
+
     {
-      title: "Products & Courses",
+      title: "Products",
       url: "/manage/products",
       icon: Columns,
       roles: ["admin", "educator"],
     },
+
+    {
+      title: "Subjects & Topics",
+      url: "/manage/subjects-topics",
+      icon: ListTree,
+      roles: ["admin"],
+    },
+
     {
       title: "Educators",
       url: "/manage/educators",
       icon: GraduationCap,
       roles: ["admin"],
     },
+
     {
       title: "Student Roster",
       url: "/manage/roster",
       icon: Users,
       roles: ["admin", "educator"],
     },
+
     {
       title: "Sessions",
       url: "/manage/sessions",
       icon: Calendar,
       roles: ["admin", "educator"],
     },
+
     {
       title: "Payouts & Earnings",
       url: "/manage/payouts",
       icon: CreditCard,
       roles: ["admin", "educator"],
     },
+
     {
       title: "Transactions",
       url: "/manage/transactions",
@@ -101,6 +116,7 @@ const navigationData: Record<string, NavItem[]> = {
       icon: IconCash,
       roles: ["admin", "educator"],
     },
+
     {
       title: "Settings",
       url: "/manage/settings",

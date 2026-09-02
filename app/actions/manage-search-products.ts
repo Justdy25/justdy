@@ -7,7 +7,7 @@ export interface ProductSearchResult {
   id: string;
   title: string;
   slug: string;
-  price: number;
+  price: number | null;
   category: string | null;
   type: string;
   imageUrl: string | null;
@@ -70,17 +70,6 @@ export async function searchProducts(
       category: true,
       type: true,
       imageKey: true,
-
-      images: {
-        select: {
-          imageKey: true,
-          position: true,
-        },
-        orderBy: {
-          position: "asc",
-        },
-        take: 1,
-      },
     },
 
     orderBy: {
@@ -90,18 +79,13 @@ export async function searchProducts(
     take: 8,
   });
 
-  return products.map((product) => {
-    const primaryImage =
-      product.images[0]?.imageKey ?? product.imageKey ?? null;
-
-    return {
-      id: product.id,
-      title: product.title,
-      slug: product.slug,
-      price: product.price,
-      category: product.category,
-      type: product.type,
-      imageUrl: getImageUrl(primaryImage),
-    };
-  });
+  return products.map((product) => ({
+    id: product.id,
+    title: product.title,
+    slug: product.slug,
+    price: product.price,
+    category: product.category,
+    type: product.type,
+    imageUrl: getImageUrl(product.imageKey),
+  }));
 }

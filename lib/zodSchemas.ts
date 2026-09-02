@@ -1,10 +1,19 @@
 import { z } from "zod";
+
+/* ============================================================
+   PRODUCT STATUS
+============================================================ */
+
 export const productStatus = [
   "Draft",
   "Published",
   "Rejected",
   "Pending",
 ] as const;
+
+/* ============================================================
+   PRODUCT TYPES
+============================================================ */
 
 export const productType = [
   "Course",
@@ -18,18 +27,104 @@ export const productType = [
   "Guides",
   "Bundles",
 ] as const;
+
+/* ============================================================
+   GRADE LEVELS
+============================================================ */
+
+export const gradeLevels = [
+  {
+    value: "Grade1",
+    label: "Grade 1",
+  },
+  {
+    value: "Grade2",
+    label: "Grade 2",
+  },
+  {
+    value: "Grade3",
+    label: "Grade 3",
+  },
+  {
+    value: "Grade4",
+    label: "Grade 4",
+  },
+  {
+    value: "Grade5",
+    label: "Grade 5",
+  },
+  {
+    value: "Grade6",
+    label: "Grade 6",
+  },
+  {
+    value: "Grade7",
+    label: "Grade 7",
+  },
+  {
+    value: "Grade8",
+    label: "Grade 8",
+  },
+  {
+    value: "Grade9",
+    label: "Grade 9",
+  },
+  {
+    value: "Grade10",
+    label: "Grade 10",
+  },
+  {
+    value: "Grade11",
+    label: "Grade 11",
+  },
+  {
+    value: "Grade12",
+    label: "Grade 12",
+  },
+] as const;
+
+export const gradeLevelValues = gradeLevels.map((grade) => grade.value) as [
+  string,
+  ...string[],
+];
+
+/* ============================================================
+   SUBJECTS
+============================================================ */
+
+export const subjects = [
+  "Mathematics",
+  "Writing",
+  "Reading",
+  "Science",
+  "Social Studies",
+  "English",
+] as const;
+
+/* ============================================================
+   COURSE CATEGORIES
+============================================================ */
+
 export const courseCategories = ["Mathematics", "Writing", "Reading"] as const;
+
+/* ============================================================
+   AUTH
+============================================================ */
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email"),
+
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export const signupSchema = z
   .object({
     name: z.string().min(2, "Name is required"),
+
     email: z.string().email("Invalid email"),
+
     password: z.string().min(8, "Password must be at least 8 characters"),
+
     confirmPassword: z.string().min(8),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -37,82 +132,338 @@ export const signupSchema = z
     path: ["confirmPassword"],
   });
 
+/* ============================================================
+   PRODUCT
+============================================================ */
+
 export const productSchema = z.object({
+  /* ==========================================================
+     BASIC INFORMATION
+  ========================================================== */
+
   title: z
     .string()
-    .min(3, { message: "Title must be at least 3 characters long" })
-    .max(100, { message: "Title must be at most 100 characters long" }),
-  description: z
-    .string()
-    .min(3, { message: "Description must be at least 3 characters long" }),
-  price: z.coerce
-    .number()
-    .min(1, { message: "Price must be a positive number" }),
-  printedPrice: z.number().nonnegative().optional(),
-  type: z.enum(productType, { message: "Type is required" }),
-  slug: z
-    .string()
-    .min(3, { message: "Slug must be at least 3 characters long" }),
-  status: z.enum(productStatus, { message: "Status is required" }),
+    .min(3, {
+      message: "Title must be at least 3 characters long",
+    })
+    .max(100, {
+      message: "Title must be at most 100 characters long",
+    }),
+
+  description: z.string().min(3, {
+    message: "Description must be at least 3 characters long",
+  }),
+
+  slug: z.string().min(3, {
+    message: "Slug must be at least 3 characters long",
+  }),
+
+  /* ==========================================================
+     PRODUCT TYPE
+  ========================================================== */
+
+  type: z.enum(productType, {
+    message: "Type is required",
+  }),
+
+  /* ==========================================================
+     ACADEMIC CLASSIFICATION
+     
+     These are DATABASE RELATION IDs.
+     
+     Example:
+     
+     gradeLevel = Grade1
+     subjectId  = "cm..."
+     topicId    = "cm..."
+  ========================================================== */
+
+  gradeLevel: z.enum(gradeLevelValues, {
+    message: "Grade level is required",
+  }),
+
+  subjectId: z.string().min(1, {
+    message: "Subject is required",
+  }),
+
+  topicId: z.string().min(1, {
+    message: "Topic is required",
+  }),
+
+  /* ==========================================================
+     DIGITAL PRICE
+     
+     Optional here because worksheets do not have
+     an individual price.
+     
+     The SERVER determines whether price is required.
+  ========================================================== */
+
+  price: z.coerce.number().nonnegative().optional().nullable(),
+
+  /* ==========================================================
+     PRINTED PRICE
+     
+     Only used for Workbooks.
+  ========================================================== */
+
+  printedPrice: z.coerce.number().nonnegative().optional().nullable(),
+
+  /* ==========================================================
+     STATUS
+     
+     The server will create new products as Draft.
+  ========================================================== */
+
+  status: z.enum(productStatus, {
+    message: "Status is required",
+  }),
+
+  /* ==========================================================
+     DIGITAL FILE
+  ========================================================== */
+
   fileKey: z.string().optional(),
-  duration: z.coerce.number().optional().nullable(),
+
+  /* ==========================================================
+     COURSE INFORMATION
+  ========================================================== */
+
+  duration: z.coerce.number().positive().optional().nullable(),
+
   category: z.enum(courseCategories).optional().or(z.literal("")),
 });
 
+/* ============================================================
+   CHAPTER
+============================================================ */
+
 export const chapterSchema = z.object({
-  name: z
-    .string()
-    .min(3, { message: "Name must be at least 3 characters long" }),
+  name: z.string().min(3, {
+    message: "Name must be at least 3 characters long",
+  }),
+
   productId: z.string(),
 });
 
+/* ============================================================
+   LESSON
+============================================================ */
+
 export const lessonSchema = z.object({
-  name: z
-    .string()
-    .min(3, { message: "Name must be at least 3 characters long" }),
-  productId: z.string().min(1, { message: "Invalid product id" }),
-  chapterId: z.string().min(1, { message: "Invalid chapter id" }),
+  name: z.string().min(3, {
+    message: "Name must be at least 3 characters long",
+  }),
+
+  productId: z.string().min(1, {
+    message: "Invalid product id",
+  }),
+
+  chapterId: z.string().min(1, {
+    message: "Invalid chapter id",
+  }),
+
   description: z
     .string()
-    .min(3, { message: "Description must be at least 3 characters long" })
+    .min(3, {
+      message: "Description must be at least 3 characters long",
+    })
     .optional(),
+
   thumbnailKey: z.string().optional(),
+
   videoKey: z.string().optional(),
 });
 
+/* ============================================================
+   SETTINGS
+============================================================ */
+
 export const settingsSchema = z.object({
   fullName: z.string().min(3).max(150),
+
   profileImage: z.string(),
 });
 
+/* ============================================================
+   EDUCATOR
+============================================================ */
+
 export const educatorSchema = z.object({
-  specialty: z.string().min(1, { message: "Specialty is required" }),
-  experience: z
-    .number()
-    .min(1, { message: "Experience must be a non-negative number" }),
+  specialty: z.string().min(1, {
+    message: "Specialty is required",
+  }),
+
+  experience: z.number().min(1, {
+    message: "Experience must be a non-negative number",
+  }),
+
   credentialUrl: z.string().url(),
+
   description: z.string().min(3).max(500),
 });
 
+/* ============================================================
+   SUBJECT
+============================================================ */
+
 export const subjectSchema = z.object({
   name: z.string().min(1, "Subject name is required"),
+
   description: z.string().optional().nullable(),
 });
 
-export const packagesSchema = z.object({
-  name: z.string().min(1, "Package name is required"),
+/* ============================================================
+   TOPIC
+============================================================ */
+
+export const topicSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Topic name is required")
+    .max(150, "Topic name is too long"),
+
   description: z.string().optional().nullable(),
-  targetGrades: z.string().min(1, "Target grades are required"),
-  price: z.coerce
-    .number()
-    .min(1, { message: "Price must be a positive number" }),
+
+  gradeLevel: z.enum(gradeLevelValues, {
+    message: "Grade level is required",
+  }),
+
+  subjectId: z.string().min(1, "Subject is required"),
+
+  slug: z.string().min(1, "Topic slug is required"),
+});
+
+/* ============================================================
+   SUBJECT
+============================================================ */
+
+export const createSubjectSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Subject name must be at least 2 characters")
+    .max(100, "Subject name is too long"),
+
+  description: z
+    .string()
+    .trim()
+    .max(500, "Description is too long")
+    .optional()
+    .or(z.literal("")),
+});
+
+export const updateSubjectSchema = z.object({
+  id: z.string().min(1, "Invalid subject ID"),
+
+  name: z
+    .string()
+    .trim()
+    .min(2, "Subject name must be at least 2 characters")
+    .max(100, "Subject name is too long"),
+
+  description: z
+    .string()
+    .trim()
+    .max(500, "Description is too long")
+    .optional()
+    .or(z.literal("")),
+});
+
+/* ============================================================
+   TOPIC
+============================================================ */
+
+export const createTopicSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Topic name must be at least 2 characters")
+    .max(150, "Topic name is too long"),
+
+  description: z
+    .string()
+    .trim()
+    .max(500, "Description is too long")
+    .optional()
+    .or(z.literal("")),
+
+  gradeLevel: z.enum(gradeLevelValues, {
+    message: "Grade level is required",
+  }),
+
   subjectId: z.string().min(1, "Subject is required"),
 });
 
+export const updateTopicSchema = z.object({
+  id: z.string().min(1, "Invalid topic ID"),
+
+  name: z
+    .string()
+    .trim()
+    .min(2, "Topic name must be at least 2 characters")
+    .max(150, "Topic name is too long"),
+
+  description: z
+    .string()
+    .trim()
+    .max(500, "Description is too long")
+    .optional()
+    .or(z.literal("")),
+
+  gradeLevel: z.enum(gradeLevelValues, {
+    message: "Grade level is required",
+  }),
+
+  subjectId: z.string().min(1, "Subject is required"),
+});
+
+/* ============================================================
+   TYPES
+============================================================ */
+
+export type CreateSubjectSchemaType = z.infer<typeof createSubjectSchema>;
+
+export type UpdateSubjectSchemaType = z.infer<typeof updateSubjectSchema>;
+
+export type CreateTopicSchemaType = z.infer<typeof createTopicSchema>;
+
+export type UpdateTopicSchemaType = z.infer<typeof updateTopicSchema>;
+
+/* ============================================================
+   PACKAGES
+============================================================ */
+
+export const packagesSchema = z.object({
+  name: z.string().min(1, "Package name is required"),
+
+  description: z.string().optional().nullable(),
+
+  targetGrades: z.string().min(1, "Target grades are required"),
+
+  price: z.coerce.number().min(1, {
+    message: "Price must be a positive number",
+  }),
+
+  subjectId: z.string().min(1, "Subject is required"),
+});
+
+/* ============================================================
+   TYPES
+============================================================ */
+
 export type ProductSchemaType = z.output<typeof productSchema>;
+
 export type ChapterSchemaType = z.infer<typeof chapterSchema>;
+
 export type LessonSchemaType = z.infer<typeof lessonSchema>;
+
 export type SettingsSchemaType = z.infer<typeof settingsSchema>;
+
 export type EducatorSchemaType = z.infer<typeof educatorSchema>;
+
 export type SubjectSchemaType = z.infer<typeof subjectSchema>;
+
+export type TopicSchemaType = z.infer<typeof topicSchema>;
+
 export type PackagesSchemaType = z.infer<typeof packagesSchema>;

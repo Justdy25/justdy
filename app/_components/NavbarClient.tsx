@@ -12,13 +12,13 @@ import {
   ArrowRight,
   ShoppingCartIcon,
   Loader2,
-  MenuIcon,
   ShoppingBasket,
   MessageSquare,
   Settings,
   LogOut,
   LayoutDashboard,
   ChevronRight,
+  GraduationCap,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
@@ -33,7 +33,7 @@ import { Separator } from "./ui/separator";
 import Image from "next/image";
 
 import { ProductSearchInput } from "./ProductSearchInput";
-import { ProductMegaMenu, ProductMobileMenu } from "./ProductMegaMenu";
+import { ProductMobileMenu } from "./ProductMegaMenu";
 
 import { createCheckoutSessionAction } from "../actions/manage-checkout-session";
 import { toast } from "sonner";
@@ -88,7 +88,7 @@ function AccountMenuItem({
         flex
         items-center
         gap-3
-        rounded-xl
+        rounded-md
         px-3
         py-2.5
         transition-all
@@ -168,7 +168,6 @@ export function NavbarClient() {
   // ============================================================
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
@@ -584,411 +583,417 @@ export function NavbarClient() {
         z-50
         w-full
         border-b
-        border-slate-200
-        bg-blue-100
+        border-slate-200/80
+        bg-white/90
         backdrop-blur-xl
-        dark:border-slate-300
+        shadow-[0_1px_12px_rgba(15,23,42,0.04)]
       "
     >
       <div
         className="
           mx-auto
           flex
-          h-14
-          max-w-8xl
+          h-18
+          max-w-7xl
           items-center
           px-4
           sm:px-6
-          lg:px-28
+          lg:px-8
+          xl:px-10
         "
       >
         {/* ======================================================
             DESKTOP HEADER
         ====================================================== */}
 
-        <div
-          className="
-            hidden
-            w-full
-            items-center
-            gap-6
-            md:grid
-            md:grid-cols-[auto_minmax(360px,1fr)_auto]
-          "
-        >
-          {/* LOGO + NAVIGATION */}
+        <div className="hidden w-full items-center gap-3 md:flex">
+          {/* LOGO */}
+          <div className="shrink-0">
+            <MyLogo showText={true} />
+          </div>
 
-          <div className="flex min-w-0 items-center gap-0">
-            <div className="shrink-0">
-              <MyLogo showText={true} />
+          {/* PRIMARY NAV */}
+          <nav
+            className="ml-3 flex shrink-0 items-center gap-1.5"
+            aria-label="Primary navigation"
+          >
+            {/* TUTORING — PRIMARY CTA */}
+            <Link
+              href="/free-assessment"
+              className="
+                group
+                inline-flex
+                h-10
+                items-center
+                gap-2
+                whitespace-nowrap
+                rounded-md
+                border
+                border-blue-200
+                bg-blue-50
+                px-3.5
+                text-sm
+                font-semibold
+                text-blue-700
+                shadow-sm
+                transition-all
+                duration-200
+                hover:border-blue-300
+                hover:bg-blue-100
+                hover:text-blue-800
+                hover:shadow-md
+                active:scale-[0.98]
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-500/20
+              "
+            >
+              <span className="flex size-6 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+                <GraduationCap className="size-3.5" />
+              </span>
+              Free Session
+              <span className="hidden rounded-full bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 xl:inline-flex">
+                1:1
+              </span>
+            </Link>
+
+            {/* VIDEO LESSONS */}
+            <Link
+              href="/videos"
+              className="
+                inline-flex
+                h-10
+                items-center
+                whitespace-nowrap
+                rounded-xl
+                px-3
+                text-sm
+                font-medium
+                text-slate-600
+                transition-all
+                duration-200
+                hover:bg-slate-100
+                hover:text-slate-900
+                focus:outline-none
+                focus:ring-2
+                focus:ring-slate-500/10
+              "
+            >
+              Video Lessons
+            </Link>
+          </nav>
+
+          {/* SEARCH */}
+          <div className="ml-2 min-w-0 flex-1">
+            <div className="mx-auto max-w-2xl">
+              <ProductSearchInput />
             </div>
-
-            <nav className="flex shrink-0 items-center gap-1">
-              <div
-                className="relative"
-                onMouseEnter={() => setServicesOpen(true)}
-                onMouseLeave={() => setServicesOpen(false)}
-              >
-                <button
-                  type="button"
-                  onClick={() => setServicesOpen((previous) => !previous)}
-                  aria-expanded={servicesOpen}
-                  aria-haspopup="true"
-                  className="
-                    flex
-                    cursor-pointer
-                    items-center
-                    gap-1.5
-                    rounded-md
-                    px-4
-                    py-2
-                    text-md
-                    font-bold
-                    text-blue-500
-                    transition-all
-                    duration-200
-                    hover: bg-blue-100 
-                    hover:text-blue-600
-                    focus:outline-none
-                    focus:ring-2
-                    focus:ring-[#857938]/30
-                  "
-                >
-                  <MenuIcon className="size-5" />
-
-                  <span>Categories</span>
-
-                  <ChevronDown
-                    className={cn(
-                      "size-4 transition-transform duration-200",
-                      servicesOpen && "rotate-180",
-                    )}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {servicesOpen && (
-                    <ProductMegaMenu onClose={() => setServicesOpen(false)} />
-                  )}
-                </AnimatePresence>
-              </div>
-            </nav>
           </div>
 
-          {/* DESKTOP SEARCH */}
-
-          <div className="w-full min-w-0 justify-self-center">
-            <ProductSearchInput />
-          </div>
-
-          {/* ====================================================
-              RIGHT — ACCOUNT + CART
-          ==================================================== */}
-
-          <div className="flex min-w-0 items-center justify-end gap-3">
+          {/* RIGHT SIDE */}
+          <div className="ml-2 flex shrink-0 items-center gap-1.5">
             {!isPending &&
               mounted &&
               (session ? (
-                <div className="flex items-center gap-3">
-                  {/* ==================================================
-                      ACCOUNT DROPDOWN
-                  ================================================== */}
+                /* LOGGED-IN ACCOUNT */
 
-                  <div ref={accountRef} className="relative">
-                    {/* ACCOUNT TRIGGER */}
-
-                    <button
-                      type="button"
-                      onClick={() => setAccountOpen((previous) => !previous)}
-                      aria-expanded={accountOpen}
-                      aria-haspopup="menu"
-                      aria-label="Open account menu"
-                      className={cn(
-                        `
-                        group
+                <div ref={accountRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountOpen((previous) => !previous)}
+                    aria-expanded={accountOpen}
+                    aria-haspopup="menu"
+                    aria-label="Open account menu"
+                    className={cn(
+                      `
                         flex
-                        h-11
+                        h-10
                         items-center
                         gap-2
-                        rounded-md
-                        border
-                        px-1.5
-                        pr-2.5
+                        rounded-xl
+                        px-2.5
+                        pr-3
+                        text-sm
+                        font-medium
                         transition-all
                         duration-200
                         focus:outline-none
                         focus:ring-2
-                        focus:ring-[#857938]/20
-                        `,
-                        accountOpen
-                          ? "border-[#857938]/30 bg-[#857938]/10 shadow-sm"
-                          : "border-transparent hover:border-slate-200 hover:bg-blue-500",
-                      )}
+                        focus:ring-blue-500/20
+                      `,
+                      accountOpen
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    )}
+                  >
+                    <div
+                      className="
+                        relative
+                        flex
+                        size-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        overflow-hidden
+                        rounded-full
+                        bg-blue-600
+                        text-xs
+                        font-bold
+                        text-white
+                        ring-2
+                        ring-white
+                      "
                     >
-                      {/* AVATAR */}
+                      {userImage ? (
+                        <Image
+                          src={userImage}
+                          alt={userName}
+                          fill
+                          sizes="32px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        userInitials
+                      )}
+                    </div>
 
-                      <div
+                    <span className="hidden max-w-[100px] truncate text-sm font-semibold text-slate-700 lg:block">
+                      {userName}
+                    </span>
+
+                    <ChevronDown
+                      className={cn(
+                        "size-4 text-slate-400 transition-transform",
+                        accountOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
+
+                  {/* ACCOUNT DROPDOWN */}
+
+                  <AnimatePresence>
+                    {accountOpen && (
+                      <motion.div
+                        variants={accountMenuVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
                         className="
-                          relative
-                          flex
-                          size-9
-                          shrink-0
-                          items-center
-                          justify-center
+                          absolute
+                          right-0
+                          top-[calc(100%+10px)]
+                          z-100
+                          w-80
                           overflow-hidden
-                          rounded-full
-                          bg-blue-500
-                          text-xs
-                          font-bold
-                          text-white
-                          ring-2
-                          ring-white
-                          shadow-sm
+                          rounded-2xl
+                          border
+                          border-slate-200/80
+                          bg-white
+                          shadow-[0_24px_70px_rgba(15,23,42,0.14)]
+                          ring-1 ring-black/2
                         "
                       >
-                        {userImage ? (
-                          <Image
-                            src={userImage}
-                            alt={userName}
-                            fill
-                            sizes="36px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          userInitials
-                        )}
-                      </div>
+                        {/* PROFILE HEADER */}
 
-                      {/* USER NAME */}
-
-                      <ChevronDown
-                        className={cn(
-                          "size-4 text-slate-500 transition-transform duration-200",
-                          accountOpen && "rotate-180",
-                        )}
-                      />
-                    </button>
-
-                    {/* =================================================
-                        DROPDOWN
-                    ================================================= */}
-
-                    <AnimatePresence>
-                      {accountOpen && (
-                        <motion.div
-                          variants={accountMenuVariants}
-                          initial="hidden"
-                          animate="visible"
-                          exit="hidden"
+                        <div
                           className="
-                            absolute
-                            right-0
-                            top-[calc(100%+10px)]
-                            z-100
-                            w-80
-                            overflow-hidden
-                            rounded-2xl
-                            border
-                            border-slate-200
-                            bg-white
-                            shadow-[0_20px_60px_rgba(15,23,42,0.16)]
+                            border-b
+                            border-slate-100
+                            bg-gradient-to-br
+                            from-blue-50
+                            via-white
+                            to-slate-50
+                            p-4
                           "
                         >
-                          {/* PROFILE HEADER */}
-
-                          <div
+                          <Link
+                            href={dashboardUrl}
+                            onClick={() => setAccountOpen(false)}
                             className="
-                              border-b
-                              border-slate-100
-                              bg-linear-to-br
-                              from-[#857938]/10
-                              via-white
-                              to-slate-50
-                              p-4
+                              group
+                              flex
+                              items-center
+                              gap-3
+                              rounded-xl
+                              p-2
+                              transition-colors
+                              hover:bg-white/80
                             "
                           >
-                            <Link
-                              href={dashboardUrl}
-                              onClick={() => setAccountOpen(false)}
+                            <div
                               className="
-                                group
+                                relative
                                 flex
-                                cursor-pointer
+                                size-12
+                                shrink-0
                                 items-center
-                                gap-3
-                                rounded-xl
-                                p-2
-                                transition-colors
-                                hover:bg-white
+                                justify-center
+                                overflow-hidden
+                                rounded-full
+                                bg-blue-600
+                                text-sm
+                                font-bold
+                                text-white
                               "
                             >
-                              <div
-                                className="
-                                  relative
-                                  flex
-                                  size-12
-                                  shrink-0
-                                  items-center
-                                  justify-center
-                                  overflow-hidden
-                                  rounded-full
-                                  bg-blue-500
-                                  text-sm
-                                  font-bold
-                                  text-white
-                                  ring-2
-                                  ring-white
-                                  shadow-md
-                                "
-                              >
-                                {userImage ? (
-                                  <Image
-                                    src={userImage}
-                                    alt={userName}
-                                    fill
-                                    sizes="48px"
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  userInitials
-                                )}
-                              </div>
+                              {userImage ? (
+                                <Image
+                                  src={userImage}
+                                  alt={userName}
+                                  fill
+                                  sizes="48px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                userInitials
+                              )}
+                            </div>
 
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-base font-bold text-slate-900">
-                                  {userName}
-                                </p>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-base font-bold text-slate-900">
+                                {userName}
+                              </p>
 
-                                <p className="truncate text-sm text-slate-500">
-                                  Go to dashboard
-                                </p>
-                              </div>
+                              <p className="truncate text-sm text-slate-500">
+                                Go to dashboard
+                              </p>
+                            </div>
 
-                              <ChevronRight
-                                className="
-                                  size-4
-                                  text-slate-300
-                                  transition-transform
-                                  group-hover:translate-x-0.5
-                                "
-                              />
-                            </Link>
-                          </div>
+                            <ChevronRight className="size-4 text-slate-300 transition-transform group-hover:translate-x-0.5" />
+                          </Link>
+                        </div>
 
-                          {/* ACCOUNT SETTINGS */}
+                        {/* ACCOUNT OPTIONS */}
 
-                          <div className="p-2">
-                            <AccountMenuItem
-                              href="/settings"
-                              icon={<Settings className="size-5" />}
-                              title="Account Settings"
-                              onClick={() => setAccountOpen(false)}
-                              subtitle="Manage your account"
-                            />
+                        <div className="p-2">
+                          <AccountMenuItem
+                            href="/settings"
+                            icon={<Settings className="size-5" />}
+                            title="Account Settings"
+                            subtitle="Manage your account"
+                            onClick={() => setAccountOpen(false)}
+                          />
 
-                            {/* SIGN OUT */}
-
-                            <button
-                              type="button"
-                              disabled={isSigningOut}
-                              onClick={handleSignOut}
-                              className="
-                                group
-                                flex
-                                w-full
-                                items-center
-                                gap-3
-                                rounded-xl
-                                px-3
-                                py-2.5
-                                text-left
-                                transition-all
-                                hover:bg-red-50
-                              "
-                            >
-                              <div
-                                className="
-                                  flex
-                                  size-10
-                                  shrink-0
-                                  items-center
-                                  justify-center
-                                  rounded-xl
-                                  bg-red-50
-                                  text-red-500
-                                  transition-colors
-                                  group-hover:bg-red-100
-                                "
-                              >
-                                {isSigningOut ? (
-                                  <Loader2 className="size-5 animate-spin" />
-                                ) : (
-                                  <LogOut className="size-5" />
-                                )}
-                              </div>
-
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-red-600">
-                                  {isSigningOut ? "Signing out..." : "Sign out"}
-                                </p>
-                              </div>
-                            </button>
-                          </div>
-
-                          {/* ACCOUNT FOOTER */}
-
-                          <div
+                          <button
+                            type="button"
+                            disabled={isSigningOut}
+                            onClick={handleSignOut}
                             className="
-                              border-t
-                              border-slate-100
-                              bg-slate-50/80
-                              px-5
-                              py-3
+                              group
+                              flex
+                              w-full
+                              items-center
+                              gap-3
+                              rounded-xl
+                              px-3
+                              py-2.5
+                              text-left
+                              transition-colors
+                              hover:bg-red-50
                             "
                           >
-                            <p className="truncate text-[11px] text-slate-400">
-                              {userEmail}
-                            </p>
+                            <div
+                              className="
+                                flex
+                                size-10
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-xl
+                                bg-red-50
+                                text-red-500
+                              "
+                            >
+                              {isSigningOut ? (
+                                <Loader2 className="size-5 animate-spin" />
+                              ) : (
+                                <LogOut className="size-5" />
+                              )}
+                            </div>
 
-                            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                              {userRole}
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                            <span className="text-sm font-medium text-red-600">
+                              {isSigningOut ? "Signing out..." : "Sign out"}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* ACCOUNT FOOTER */}
+
+                        <div
+                          className="
+                            border-t
+                            border-slate-100
+                            bg-slate-50
+                            px-5
+                            py-3
+                          "
+                        >
+                          <p className="truncate text-[11px] text-slate-400">
+                            {userEmail}
+                          </p>
+
+                          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                            {userRole}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => openAuthModal("signin")}
-                  className={cn(
-                    buttonVariants({
-                      variant: "default",
-                      size: "sm",
-                    }),
-                    `
-      h-9
-      cursor-pointer
-      rounded-md
-      border-0
-      bg-blue-500
-      px-5
-      text-sm
-      font-medium
-      text-white
-      shadow-md
-      shadow-[#857938]/20
-      transition-all
-      hover:bg-blue-600
-      active:scale-95
-      whitespace-nowrap
-    `,
-                  )}
-                >
-                  Sign In
-                </button>
+                <>
+                  {/* BECOME A MEMBER */}
+
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("signup")}
+                    className="
+                      hidden
+                      h-10
+                      shrink-0
+                      items-center
+                      whitespace-nowrap
+                      rounded-lg
+                      px-3
+                      text-sm
+                      font-semibold
+                      text-blue-600
+                      transition-all
+                      duration-200
+                      hover:bg-blue-50
+                      hover:text-blue-700
+                      lg:flex
+                    "
+                  >
+                    Become a Member
+                  </button>
+
+                  {/* LOGIN */}
+
+                  <button
+                    type="button"
+                    data-login-trigger="desktop"
+                    onClick={() => openAuthModal("signin")}
+                    className="
+                      flex
+                      h-10
+                      shrink-0
+                      items-center
+                      whitespace-nowrap
+                      rounded-lg
+                      px-3
+                      text-sm
+                      font-medium
+                      text-slate-600
+                      transition-all
+                      duration-200
+                      hover:bg-slate-50
+                      hover:text-slate-900
+                    "
+                  >
+                    Login
+                  </button>
+                </>
               ))}
 
             {/* CART */}
@@ -998,20 +1003,22 @@ export function NavbarClient() {
               onClick={() => setCartOpen(true)}
               className="
                 relative
+                flex
+                size-10
                 shrink-0
-                cursor-pointer
-                rounded-md
-                p-2
-                text-slate-700
-                transition-colors
-                hover:bg-blue-500
-                hover:text-white
-               
-               
+                items-center
+                justify-center
+                rounded-xl
+                text-slate-600
+                transition-all
+                duration-200
+                hover:bg-blue-50
+                hover:text-blue-600
+                active:scale-95
               "
               aria-label="Shopping Cart"
             >
-              <ShoppingCartIcon className="size-5 text-black hover:text-white" />
+              <ShoppingCartIcon className="size-5" />
 
               {mounted && totalCount > 0 && (
                 <span
@@ -1020,16 +1027,17 @@ export function NavbarClient() {
                     -right-1
                     -top-1
                     flex
-                    h-4
-                    min-w-4
+                    h-5
+                    min-w-5
                     items-center
                     justify-center
                     rounded-full
-                    bg-[#857938]
+                    bg-blue-600
                     px-1
                     text-[10px]
                     font-bold
                     text-white
+                    shadow-sm
                   "
                 >
                   {totalCount}
@@ -1739,17 +1747,12 @@ export function NavbarClient() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="
-                    rounded-lg
-                    px-3
-                    py-2.5
-                    text-sm
-                    font-medium
-                    text-slate-800
-                    transition-colors
-                    hover:bg-slate-100
-                    hover:text-[#857938]
-                  "
+                  className={cn(
+                    "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                    item.title === "Tutoring"
+                      ? "border border-blue-200 bg-blue-50 font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
+                  )}
                   onClick={closeMobileMenu}
                 >
                   {item.title}

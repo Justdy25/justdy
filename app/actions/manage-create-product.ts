@@ -6,7 +6,17 @@ import { ApiResponse } from "@/lib/types";
 import { productSchema, ProductSchemaType } from "@/lib/zodSchemas";
 import { request } from "@arcjet/next";
 import { requireManager } from "./require-manager";
-import { ProductStatus, ProductType } from "@/lib/generated/prisma/enums";
+
+import {
+  ProductStatus,
+  ProductType,
+  GradeLevel,
+  ProductAccessModel,
+} from "@/lib/generated/prisma/enums";
+
+/* ============================================================
+   ARCJET
+============================================================ */
 
 const aj = arcjet.withRule(
   fixedWindow({
@@ -16,15 +26,23 @@ const aj = arcjet.withRule(
   }),
 );
 
+/* ============================================================
+   CREATE PRODUCT
+============================================================ */
+
 export async function CreateProduct(
   values: ProductSchemaType,
 ): Promise<ApiResponse> {
+  /* ==========================================================
+     1. AUTHORIZATION
+  ========================================================== */
+
   const session = await requireManager();
 
   try {
-    // ============================================================
-    // 1. RATE LIMITING
-    // ============================================================
+    /* ========================================================
+       2. RATE LIMITING
+    ======================================================== */
 
     const req = await request();
 
@@ -47,9 +65,9 @@ export async function CreateProduct(
       };
     }
 
-    // ============================================================
-    // 2. VALIDATE FORM DATA
-    // ============================================================
+    /* ========================================================
+       3. VALIDATE FORM DATA
+    ======================================================== */
 
     const validation = productSchema.safeParse(values);
 
@@ -64,164 +82,429 @@ export async function CreateProduct(
 
     const data = validation.data;
 
-    // ============================================================
-    // 3. VALIDATE DIGITAL PRICE
-    // ============================================================
+    /* ========================================================
+       4. NORMALIZE DATA
+    ======================================================== */
 
-    if (!Number.isFinite(data.price) || data.price < 0) {
+    const title = data.title.trim();
+
+    const description = data.description.trim();
+
+    const slug = data.slug.trim();
+
+    const subjectId = data.subjectId.trim();
+
+    const topicId = data.topicId.trim();
+
+    /* ========================================================
+       5. BASIC VALIDATION
+    ======================================================== */
+
+    if (!title) {
       return {
         status: "error",
-        message: "Invalid product price.",
+        message: "Product title is required.",
       };
     }
 
-    if (data.status === "Pending" && data.price <= 0) {
+    if (!description) {
       return {
         status: "error",
-        message: "You must set a price greater than $0 to submit for review.",
+        message: "Product description is required.",
       };
     }
 
-    // ============================================================
-    // 4. CONVERT DIGITAL PRICE TO CENTS
-    // ============================================================
-    //
-    // Form:
-    //
-    // 19.99
-    //
-    // Database:
-    //
-    // 1999
-    //
-    // ============================================================
-
-    const priceInCents = Math.round(data.price * 100);
-
-    if (!Number.isFinite(priceInCents) || priceInCents < 0) {
+    if (!slug) {
       return {
         status: "error",
-        message: "Invalid product price.",
+        message: "Product slug is required.",
       };
     }
 
-    // ============================================================
-    // 5. CONVERT PRINTED PRICE TO CENTS
-    // ============================================================
-    //
-    // Courses do not have a printed price.
-    //
-    // Other product types may optionally have one.
-    //
-    // Example:
-    //
-    // 24.99 -> 2499
-    //
-    // ============================================================
+    if (!subjectId) {
+      return {
+        status: "error",
+        message: "Subject is required.",
+      };
+    }
+
+    if (!topicId) {
+      return {
+        status: "error",
+        message: "Topic is required.",
+      };
+    }
+
+    /* ========================================================
+       6. VERIFY SUBJECT
+       
+       Make sure the subject actually exists.
+    ======================================================== */
+
+    const subject = await prisma.subject.findUnique({
+      where: {
+        id: subjectId,
+      },
+
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!subject) {
+      return {
+        status: "error",
+        message: "The selected subject could not be found.",
+      };
+    }
+
+    /* ========================================================
+       7. VERIFY TOPIC
+       
+       The topic MUST belong to:
+       
+       Grade Level
+           +
+       Subject
+       
+       This prevents invalid combinations.
+       
+       Example:
+       
+       VALID:
+       Grade 1 → Mathematics → Addition
+       
+       INVALID:
+       Grade 1 → Mathematics → Grade 8 Algebra
+    ======================================================== */
+
+    const topic = await prisma.topic.findFirst({
+      where: {
+        id: topicId,
+
+        subjectId: subjectId,
+
+        gradeLevel: data.gradeLevel as GradeLevel,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        gradeLevel: true,
+        subjectId: true,
+      },
+    });
+
+    if (!topic) {
+      return {
+        status: "error",
+        message:
+          "The selected topic does not belong to the selected grade and subject.",
+      };
+    }
+
+    /* ========================================================
+       8. DETERMINE ACCESS MODEL
+       
+       IMPORTANT:
+       
+       The client does NOT decide this.
+       
+       Worksheets
+           → SUBSCRIPTION
+       
+       Everything else
+           → INDIVIDUAL
+    ======================================================== */
+
+    const accessModel =
+      data.type === "Worksheets"
+        ? ProductAccessModel.SUBSCRIPTION
+        : ProductAccessModel.INDIVIDUAL;
+
+    /* ========================================================
+       9. DIGITAL PRICE
+       
+       Worksheets:
+           price = NULL
+       
+       Other products:
+           price required
+    ======================================================== */
+
+    let priceInCents: number | null = null;
+
+    if (accessModel === ProductAccessModel.INDIVIDUAL) {
+      if (
+        data.price === undefined ||
+        data.price === null ||
+        !Number.isFinite(data.price) ||
+        data.price <= 0
+      ) {
+        return {
+          status: "error",
+          message: "A valid individual price is required for this product.",
+        };
+      }
+
+      priceInCents = Math.round(data.price * 100);
+
+      if (!Number.isFinite(priceInCents) || priceInCents <= 0) {
+        return {
+          status: "error",
+          message: "Invalid product price.",
+        };
+      }
+    }
+
+    /* ========================================================
+       10. PRINTED PRICE
+       
+       ONLY WORKBOOKS can have a printed price.
+    ======================================================== */
 
     let printedPriceInCents: number | null = null;
 
-    if (data.type !== "Course") {
+    if (data.type === "Workbooks") {
       if (data.printedPrice !== undefined && data.printedPrice !== null) {
         const printedPrice = Number(data.printedPrice);
 
         if (!Number.isFinite(printedPrice) || printedPrice < 0) {
           return {
             status: "error",
-            message: "Invalid printed product price.",
+            message: "Invalid printed price.",
           };
         }
 
         printedPriceInCents = Math.round(printedPrice * 100);
       }
+
+      /* ------------------------------------------------------
+         Printed price cannot be lower than digital price.
+      ------------------------------------------------------ */
+
+      if (
+        printedPriceInCents !== null &&
+        priceInCents !== null &&
+        printedPriceInCents < priceInCents
+      ) {
+        return {
+          status: "error",
+          message: "Printed price cannot be lower than the digital price.",
+        };
+      }
     }
 
-    // ============================================================
-    // 6. VALIDATE PRINTED PRICE
-    // ============================================================
-    //
-    // If a printed version exists, it should normally cost
-    // more than the digital version.
-    //
-    // You can remove this validation if you want to allow
-    // printed products to be cheaper.
-    //
-    // ============================================================
+    /* ========================================================
+       11. COURSE VALIDATION
+    ======================================================== */
 
-    if (printedPriceInCents !== null && printedPriceInCents < priceInCents) {
-      return {
-        status: "error",
-        message: "Printed price cannot be lower than the digital price.",
-      };
+    let duration: number | null = null;
+
+    let category: string | null = null;
+
+    if (data.type === "Course") {
+      /* ------------------------------------------------------
+         Duration
+      ------------------------------------------------------ */
+
+      if (
+        data.duration === undefined ||
+        data.duration === null ||
+        !Number.isFinite(data.duration) ||
+        data.duration <= 0
+      ) {
+        return {
+          status: "error",
+          message: "Course duration is required.",
+        };
+      }
+
+      duration = data.duration;
+
+      /* ------------------------------------------------------
+         Category
+      ------------------------------------------------------ */
+
+      if (data.category && data.category.trim()) {
+        category = data.category.trim();
+      }
     }
 
-    // ============================================================
-    // 7. CREATE PRODUCT IN DATABASE
-    // ============================================================
-    //
-    // IMPORTANT:
-    //
-    // Stripe is NOT involved here.
-    //
-    // Prisma is the source of truth for product pricing.
-    //
-    // Stripe Checkout will create a dynamic Price using
-    // the current database price when the customer checks out.
-    //
-    // ============================================================
+    /* ========================================================
+       12. STATUS
+       
+       New products always begin as Draft.
+    ======================================================== */
+
+    const status = ProductStatus.Draft;
+
+    /* ========================================================
+       13. CREATE PRODUCT
+    ======================================================== */
 
     const product = await prisma.product.create({
       data: {
-        title: data.title,
+        /* ==================================================
+             BASIC INFORMATION
+          ================================================== */
 
-        // Keep the complete rich-text HTML.
-        description: data.description,
+        title,
 
-        // Digital price stored in cents.
-        price: priceInCents,
+        description,
 
-        // Printed price stored in cents.
-        //
-        // Courses always receive null.
-        printedPrice: data.type === "Course" ? null : printedPriceInCents,
+        slug,
 
-        slug: data.slug,
+        /* ==================================================
+             ACADEMIC CLASSIFICATION
+             
+             Grade
+                ↓
+             Subject
+                ↓
+             Topic
+          ================================================== */
+
+        gradeLevel: data.gradeLevel as GradeLevel,
+
+        subjectId,
+
+        topicId,
+
+        /* ==================================================
+             PRODUCT TYPE
+          ================================================== */
 
         type: data.type as ProductType,
 
-        status: data.status as ProductStatus,
+        /* ==================================================
+             ACCESS MODEL
+          ================================================== */
+
+        accessModel,
+
+        /* ==================================================
+             STATUS
+          ================================================== */
+
+        status,
+
+        /* ==================================================
+             PRICING
+          ================================================== */
+
+        price: priceInCents,
+
+        printedPrice: data.type === "Workbooks" ? printedPriceInCents : null,
+
+        /* ==================================================
+             OWNER
+          ================================================== */
 
         userId: session.user.id,
+
+        /* ==================================================
+             COURSE INFORMATION
+          ================================================== */
+
+        duration,
+
+        category,
+
+        /* ==================================================
+             DIGITAL FILE
+          ================================================== */
+
+        fileKey: data.fileKey?.trim() || null,
       },
+
+      /* ====================================================
+           RETURN CREATED PRODUCT
+        ==================================================== */
 
       select: {
         id: true,
+
         title: true,
-        price: true,
-        printedPrice: true,
+
+        gradeLevel: true,
+
+        subjectId: true,
+
+        topicId: true,
+
         type: true,
+
+        accessModel: true,
+
+        price: true,
+
+        printedPrice: true,
+
         status: true,
+
+        subject: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+
+        topic: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
     });
 
-    // ============================================================
-    // 8. SUCCESS
-    // ============================================================
+    /* ========================================================
+       14. LOG PRODUCT
+    ======================================================== */
 
     console.log("PRODUCT CREATED:", {
       id: product.id,
+
       title: product.title,
+
+      gradeLevel: product.gradeLevel,
+
+      subjectId: product.subjectId,
+
+      subject: product.subject?.name,
+
+      topicId: product.topicId,
+
+      topic: product.topic?.name,
+
       type: product.type,
+
+      accessModel: product.accessModel,
+
       priceInCents: product.price,
+
       printedPriceInCents: product.printedPrice,
+
       status: product.status,
     });
+
+    /* ========================================================
+       15. SUCCESS
+    ======================================================== */
 
     return {
       status: "success",
       message: "Product Created Successfully",
     };
   } catch (error) {
+    /* ========================================================
+       16. ERROR HANDLING
+    ======================================================== */
+
     console.error("SERVER ACTION ERROR:", error);
 
     return {
@@ -231,311 +514,3 @@ export async function CreateProduct(
     };
   }
 }
-
-// "use server";
-
-// import arcjet, { fixedWindow } from "@/lib/arcjet";
-// import prisma from "@/lib/prisma";
-// import { ApiResponse } from "@/lib/types";
-// import { productSchema, ProductSchemaType } from "@/lib/zodSchemas";
-// import { request } from "@arcjet/next";
-// import { requireManager } from "./require-manager";
-// import { ProductStatus, ProductType } from "@/lib/generated/prisma/enums";
-
-// const aj = arcjet.withRule(
-//   fixedWindow({
-//     mode: "LIVE",
-//     window: "1m",
-//     max: 5,
-//   }),
-// );
-
-// export async function CreateProduct(
-//   values: ProductSchemaType,
-// ): Promise<ApiResponse> {
-//   const session = await requireManager();
-
-//   try {
-//     // ============================================================
-//     // 1. RATE LIMITING
-//     // ============================================================
-
-//     const req = await request();
-
-//     const decision = await aj.protect(req, {
-//       fingerprint: session.user.id,
-//     });
-
-//     if (decision.isDenied()) {
-//       if (decision.reason.isRateLimit()) {
-//         return {
-//           status: "error",
-//           message:
-//             "You have exceeded the number of allowed requests. Please try again later.",
-//         };
-//       }
-
-//       return {
-//         status: "error",
-//         message: "Action forbidden.",
-//       };
-//     }
-
-//     // ============================================================
-//     // 2. VALIDATE FORM DATA
-//     // ============================================================
-
-//     const validation = productSchema.safeParse(values);
-
-//     if (!validation.success) {
-//       console.error("Product validation failed:", validation.error);
-
-//       return {
-//         status: "error",
-//         message: "Invalid Form Data",
-//       };
-//     }
-
-//     // ============================================================
-//     // 3. VALIDATE PRICE
-//     // ============================================================
-
-//     if (validation.data.status === "Pending" && validation.data.price <= 0) {
-//       return {
-//         status: "error",
-//         message: "You must set a price greater than $0 to submit for review.",
-//       };
-//     }
-
-//     // ============================================================
-//     // 4. CONVERT PRICE TO CENTS
-//     // ============================================================
-//     //
-//     // Example:
-//     //
-//     // 19.99 -> 1999
-//     // 12.99 -> 1299
-//     // 5.00  -> 500
-//     //
-//     // Your database stores prices in cents.
-//     //
-//     // ============================================================
-
-//     const priceInCents = Math.round(validation.data.price * 100);
-
-//     if (!Number.isFinite(priceInCents) || priceInCents < 0) {
-//       return {
-//         status: "error",
-//         message: "Invalid product price.",
-//       };
-//     }
-
-//     // ============================================================
-//     // 5. CREATE PRODUCT IN DATABASE
-//     // ============================================================
-//     //
-//     // IMPORTANT:
-//     //
-//     // We DO NOT create a Stripe Product here.
-//     //
-//     // We DO NOT create a Stripe Price here.
-//     //
-//     // Prisma is now the source of truth for:
-//     //
-//     //   - Product title
-//     //   - Product description
-//     //   - Product price
-//     //   - Product type
-//     //   - Product status
-//     //
-//     // Stripe will receive the CURRENT price dynamically
-//     // when the customer checks out.
-//     //
-//     // ============================================================
-
-//     await prisma.product.create({
-//       data: {
-//         title: validation.data.title,
-
-//         // Keep the complete rich-text HTML in your database.
-//         description: validation.data.description,
-
-//         // Store price in cents.
-//         price: priceInCents,
-
-//         slug: validation.data.slug,
-
-//         type: validation.data.type as ProductType,
-
-//         status: validation.data.status as ProductStatus,
-
-//         userId: session.user.id,
-
-//         // IMPORTANT:
-//         // No stripePriceId is required anymore.
-//         //
-//         // Stripe Checkout will use price_data dynamically.
-//       },
-//     });
-
-//     return {
-//       status: "success",
-//       message: "Product Created Successfully",
-//     };
-//   } catch (error) {
-//     console.error("SERVER ACTION ERROR:", error);
-
-//     return {
-//       status: "error",
-//       message:
-//         error instanceof Error ? error.message : "Failed to create product",
-//     };
-//   }
-// }
-
-// "use server";
-
-// import arcjet, { fixedWindow } from "@/lib/arcjet";
-// import prisma from "@/lib/prisma";
-// import { stripe } from "@/lib/stripe";
-// import { ApiResponse } from "@/lib/types";
-// import { productSchema, ProductSchemaType } from "@/lib/zodSchemas";
-// import { request } from "@arcjet/next";
-// import { requireManager } from "./require-manager";
-// import { ProductStatus, ProductType } from "@/lib/generated/prisma/enums";
-
-// const aj = arcjet.withRule(
-//   fixedWindow({
-//     mode: "LIVE",
-//     window: "1m",
-//     max: 5,
-//   }),
-// );
-
-// export async function CreateProduct(
-//   values: ProductSchemaType,
-// ): Promise<ApiResponse> {
-//   const session = await requireManager();
-
-//   try {
-//     // ============================================================
-//     // 1. RATE LIMITING
-//     // ============================================================
-
-//     const req = await request();
-
-//     const decision = await aj.protect(req, {
-//       fingerprint: session.user.id,
-//     });
-
-//     if (decision.isDenied()) {
-//       if (decision.reason.isRateLimit()) {
-//         return {
-//           status: "error",
-//           message:
-//             "You have exceeded the number of allowed requests. Please try again later.",
-//         };
-//       }
-
-//       return {
-//         status: "error",
-//         message: "Action forbidden.",
-//       };
-//     }
-
-//     // ============================================================
-//     // 2. VALIDATE FORM DATA
-//     // ============================================================
-
-//     const validation = productSchema.safeParse(values);
-
-//     if (!validation.success) {
-//       return {
-//         status: "error",
-//         message: "Invalid Form Data",
-//       };
-//     }
-
-//     // ============================================================
-//     // 3. VALIDATE PRICE
-//     // ============================================================
-
-//     if (validation.data.status === "Pending" && validation.data.price <= 0) {
-//       return {
-//         status: "error",
-//         message: "You must set a price greater than $0 to submit for review.",
-//       };
-//     }
-
-//     const priceInCents = Math.round(validation.data.price * 100);
-
-//     // ============================================================
-//     // 4. CREATE STRIPE PRODUCT
-//     // ============================================================
-//     //
-//     // IMPORTANT:
-//     // We intentionally DO NOT send the rich-text description
-//     // to Stripe.
-//     //
-//     // Your Prisma database will keep the full HTML description.
-//     //
-//     // Stripe will use:
-//     //   - Product name
-//     //   - Product image(s)
-//     //   - Product price
-//     //
-//     // This gives you a much cleaner Stripe Checkout page.
-//     //
-//     // ============================================================
-
-//     const stripeProduct = await stripe.products.create({
-//       name: validation.data.title,
-
-//       default_price_data: {
-//         currency: "usd",
-//         unit_amount: priceInCents,
-//       },
-//     });
-
-//     // ============================================================
-//     // 5. SAVE PRODUCT TO DATABASE
-//     // ============================================================
-
-//     await prisma.product.create({
-//       data: {
-//         title: validation.data.title,
-
-//         // IMPORTANT:
-//         // Keep the rich HTML description in your database.
-//         description: validation.data.description,
-
-//         // Store price in cents.
-//         price: priceInCents,
-
-//         slug: validation.data.slug,
-
-//         type: validation.data.type as ProductType,
-
-//         status: validation.data.status as ProductStatus,
-
-//         userId: session.user.id,
-
-//         // Stripe returns the default Price ID here.
-//         stripePriceId: stripeProduct.default_price as string,
-//       },
-//     });
-
-//     return {
-//       status: "success",
-//       message: "Product Created Successfully",
-//     };
-//   } catch (error) {
-//     console.error("SERVER ACTION ERROR:", error);
-
-//     return {
-//       status: "error",
-//       message:
-//         error instanceof Error ? error.message : "Failed to create product",
-//     };
-//   }
-// }
