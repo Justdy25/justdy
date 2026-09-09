@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import dynamic from "next/dynamic";
 
 import {
@@ -171,6 +177,48 @@ export default function WorksheetEditor({
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const [previewZoom, setPreviewZoom] = useState<number | null>(null);
 
+  /*
+   * ============================================================
+   * UPDATE QUESTION
+   * ============================================================
+   */
+
+  function commitChange(nextWorksheet: WorksheetDocument) {
+    setHistory((previous) => [...previous, worksheet]);
+
+    setFuture([]);
+
+    onChange(nextWorksheet);
+  }
+
+  const undo = useCallback(() => {
+    if (history.length === 0) {
+      return;
+    }
+
+    const previousWorksheet = history[history.length - 1];
+
+    setHistory((previous) => previous.slice(0, -1));
+
+    setFuture((previous) => [worksheet, ...previous]);
+
+    onChange(previousWorksheet);
+  }, [history, worksheet, onChange]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) {
+      return;
+    }
+
+    const nextWorksheet = future[0];
+
+    setFuture((previous) => previous.slice(1));
+
+    setHistory((previous) => [...previous, worksheet]);
+
+    onChange(nextWorksheet);
+  }, [future, worksheet, onChange]);
+
   useEffect(() => {
     function handleEditorKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -225,49 +273,9 @@ export default function WorksheetEditor({
     regeneratingQuestionId,
     history,
     future,
+    redo,
+    undo,
   ]);
-
-  /*
-   * ============================================================
-   * UPDATE QUESTION
-   * ============================================================
-   */
-
-  function commitChange(nextWorksheet: WorksheetDocument) {
-    setHistory((previous) => [...previous, worksheet]);
-
-    setFuture([]);
-
-    onChange(nextWorksheet);
-  }
-
-  function undo() {
-    if (history.length === 0) {
-      return;
-    }
-
-    const previousWorksheet = history[history.length - 1];
-
-    setHistory((previous) => previous.slice(0, -1));
-
-    setFuture((previous) => [worksheet, ...previous]);
-
-    onChange(previousWorksheet);
-  }
-
-  function redo() {
-    if (future.length === 0) {
-      return;
-    }
-
-    const nextWorksheet = future[0];
-
-    setFuture((previous) => previous.slice(1));
-
-    setHistory((previous) => [...previous, worksheet]);
-
-    onChange(nextWorksheet);
-  }
 
   function updateQuestion(
     questionId: string,
@@ -1329,9 +1337,6 @@ GENERAL QUALITY RULES
                       onDragOver={(event: DragEvent<HTMLDivElement>) =>
                         event.preventDefault()
                       }
-                      onDrop={(event: DragEvent<HTMLDivElement>) =>
-                        event.preventDefault()
-                      }
                       onDragEnd={() => setDraggedQuestionId(null)}
                       onAiAction={(action) =>
                         runAiQuestionAction(selectedQuestion, action)
@@ -1900,7 +1905,6 @@ function QuestionEditor({
   onAiMenuToggle,
   onDragStart,
   onDragOver,
-  onDrop,
   onDragEnd,
   onAiAction,
   onChange,
@@ -1923,7 +1927,6 @@ function QuestionEditor({
 
   onDragStart: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onAiAction: (action: AiQuestionAction) => void;
 

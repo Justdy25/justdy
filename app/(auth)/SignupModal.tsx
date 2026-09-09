@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-
 import {
   Loader,
   UserPlus,
@@ -15,7 +14,6 @@ import {
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react";
-
 import { toast } from "sonner";
 
 import { signupSchema } from "@/lib/zodSchemas";
@@ -29,7 +27,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/app/_components/ui/form";
-
 import { Input } from "@/app/_components/ui/input";
 import { Button } from "@/app/_components/ui/button";
 
@@ -44,16 +41,12 @@ interface SignupModalProps {
 
 export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
   const router = useRouter();
-
   const [isPending, startTransition] = useTransition();
-
   const [selectedRole, setSelectedRole] = useState<RoleOption>("Learner");
-
   const [password, setPassword] = useState("");
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
-
     defaultValues: {
       name: "",
       email: "",
@@ -71,38 +64,31 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
 
       if (res.type === "awaiting_admin_approval") {
         toast.info("Your account is awaiting admin approval.");
-
-        router.push("/login");
-
+        onSuccess?.();
         return;
       }
 
       if (res.type === "exists_verified") {
         toast.error("Account already exists. Please log in.");
-
-        router.push("/login");
-
+        onSwitchToSignin?.();
         return;
       }
 
       if (res.type === "exists_unverified") {
         toast.error("An unverified account already exists with this email.");
-
+        onSuccess?.();
         router.push(
           `/verify-request?email=${encodeURIComponent(values.email)}`,
         );
-
         return;
       }
+
       if (res.type === "created") {
         toast.success("Verification email sent! Please check your inbox.");
-
         onSuccess?.();
-
         router.push(
           `/verify-request?email=${encodeURIComponent(values.email)}`,
         );
-
         return;
       }
 
@@ -110,188 +96,96 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
     });
   }
 
-  // Password strength calculation
   const getStrength = (pass: string) => {
     let score = 0;
-
     if (!pass) return score;
-
     if (pass.length >= 8) score++;
-
     if (/[A-Z]/.test(pass)) score++;
-
     if (/[0-9]/.test(pass)) score++;
-
     if (/[^A-Za-z0-9]/.test(pass)) score++;
-
     return score;
   };
 
   const strength = getStrength(password);
-
-  const strengthColors = [
-    "bg-zinc-800",
-    "bg-red-500",
+  const strengthClasses = [
+    "bg-muted",
+    "bg-destructive",
     "bg-orange-500",
     "bg-yellow-500",
     "bg-emerald-500",
   ];
 
   return (
-    <div className="w-full p-1 rounded-xl bg-white border border-gray-200 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)]">
-      <div className="bg-white rounded-lg border border-gray-100 py-6 px-5 sm:px-8">
-        {/* Header */}
-        <div className="flex flex-col items-center text-center mb-6">
-          <div className="mb-3">
-            <Image src={LogoImg} alt="Logo" width={44} height={44} priority />
+    <div className="w-full overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-[0_24px_80px_-24px_hsl(var(--foreground)/0.25)]">
+      <div className="p-6 sm:p-8">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Image src={LogoImg} alt="Justdy" width={40} height={40} priority />
           </div>
-
-          <h2 className="text-2xl font-bold tracking-tight text-blue-600">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Create your account
           </h2>
-
-          <p className="text-gray-500 text-xs mt-1">
-            Select your account type to get started
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Choose how you want to use Justdy.
           </p>
         </div>
 
-        {/* Form */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            {/* Role Selection */}
-            <div className="space-y-1 mb-4">
-              <FormLabel className="text-[11px] text-gray-600 font-medium">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <FormLabel className="text-xs font-medium text-foreground">
                 I am joining as a
               </FormLabel>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                {/* Learner */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole("Learner")}
-                  className={`
-                    relative
-                    flex
-                    flex-col
-                    items-start
-                    p-3
-                    rounded-md
-                    border
-                    text-left
-                    transition-all
-                    duration-200
-                    cursor-pointer
+              <div className="grid grid-cols-2 gap-2.5">
+                {(["Learner", "Educator"] as const).map((role) => {
+                  const selected = selectedRole === role;
+                  const isLearner = role === "Learner";
 
-                    ${
-                      selectedRole === "Learner"
-                        ? "bg-[#857938]/5 border-blue-500 ring-1 ring-[#857938]/20 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-[#857938]/50 hover:bg-[#857938]/3"
-                    }
-                  `}
-                >
-                  {selectedRole === "Learner" && (
-                    <CheckCircle2
-                      className="
-                        absolute
-                        top-2
-                        right-2
-                        w-3.5
-                        h-3.5
-                        text-blue-500
-                      "
-                    />
-                  )}
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setSelectedRole(role)}
+                      aria-pressed={selected}
+                      className={`relative flex min-h-[104px] flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                        selected
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {selected && (
+                        <CheckCircle2 className="absolute right-2.5 top-2.5 h-4 w-4 text-primary" />
+                      )}
 
-                  <div
-                    className={`
-                      p-1.5
-                      rounded-md
-                      mb-1.5
+                      <div
+                        className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg ${
+                          selected
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {isLearner ? (
+                          <BookOpen className="h-4 w-4" />
+                        ) : (
+                          <GraduationCap className="h-4 w-4" />
+                        )}
+                      </div>
 
-                      ${
-                        selectedRole === "Learner"
-                          ? "bg-[#857938]/10 text-blue-500"
-                          : "bg-gray-100 text-gray-500"
-                      }
-                    `}
-                  >
-                    <BookOpen size={15} />
-                  </div>
-
-                  <span className="text-xs font-semibold text-blue-500">
-                    Learner
-                  </span>
-
-                  <span className="text-[9px] text-gray-500 mt-0.5">
-                    Explore courses
-                  </span>
-                </button>
-
-                {/* Educator */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole("Educator")}
-                  className={`
-                    relative
-                    flex
-                    flex-col
-                    items-start
-                    p-3
-                    rounded-md
-                    border
-                    text-left
-                    transition-all
-                    duration-200
-                    cursor-pointer
-
-                    ${
-                      selectedRole === "Educator"
-                        ? "bg-[#857938]/5 border-blue-500 ring-1 ring-[#857938]/20 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-[#857938]/50 hover:bg-[#857938]/3"
-                    }
-                  `}
-                >
-                  {selectedRole === "Educator" && (
-                    <CheckCircle2
-                      className="
-                        absolute
-                        top-2
-                        right-2
-                        w-3.5
-                        h-3.5
-                        text-blue-600
-                      "
-                    />
-                  )}
-
-                  <div
-                    className={`
-                      p-1.5
-                      rounded-md
-                      mb-1.5
-
-                      ${
-                        selectedRole === "Educator"
-                          ? "bg-[#857938]/10 text-[#857938]"
-                          : "bg-gray-100 text-gray-500"
-                      }
-                    `}
-                  >
-                    <GraduationCap size={15} />
-                  </div>
-
-                  <span className="text-xs font-semibold text-blue-600">
-                    Educator
-                  </span>
-
-                  <span className="text-[9px] text-gray-500 mt-0.5">
-                    Teach & offer bookings
-                  </span>
-                </button>
+                      <span className="text-xs font-semibold text-foreground">
+                        {role}
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-muted-foreground">
+                        {isLearner
+                          ? "Explore courses & sessions"
+                          : "Teach & offer bookings"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Full Name */}
             <FormField
               control={form.control}
               name="name"
@@ -302,25 +196,14 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
                       placeholder="Full Name"
                       autoComplete="name"
                       {...field}
-                      className="
-                        h-10
-                        bg-white
-                        border-gray-200
-                        text-gray-900
-                        text-xs
-                        placeholder:text-gray-400
-                        focus:border-blue-500
-                        focus:ring-[#857938]/20
-                      "
+                      className="h-11 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </FormControl>
-
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Email */}
             <FormField
               control={form.control}
               name="email"
@@ -332,83 +215,54 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
                       placeholder="Email Address"
                       autoComplete="email"
                       {...field}
-                      className="
-                        h-10
-                        bg-white
-                        border-gray-200
-                        text-gray-900
-                        text-xs
-                        placeholder:text-gray-400
-                        focus:border-blue-500
-                        focus:ring-[#857938]/20
-                      "
+                      className="h-11 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </FormControl>
-
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Password */}
             <FormField
               control={form.control}
               name="password"
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <Input
                         type="password"
                         placeholder="Password"
                         autoComplete="new-password"
                         {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          setPassword(e.target.value);
+                        onChange={(event) => {
+                          field.onChange(event);
+                          setPassword(event.target.value);
                         }}
-                        className="
-                          h-10
-                          bg-white
-                          border-gray-200
-                          text-gray-900
-                          text-xs
-                          placeholder:text-gray-400
-                          focus:border-blue-500
-                          focus:ring-[#857938]/20
-                        "
+                        className="h-11 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                       />
-
-                      {/* Password Strength */}
-                      <div className="flex gap-1 h-1 w-full px-0.5 pt-0.5">
+                      <div
+                        className="flex h-1 gap-1 px-0.5"
+                        aria-label={`Password strength ${strength} of 4`}
+                      >
                         {[1, 2, 3, 4].map((step) => (
                           <div
                             key={step}
-                            className={`
-                              h-full
-                              flex-1
-                              rounded-full
-                              transition-all
-                              duration-300
-
-                              ${
-                                strength >= step
-                                  ? strengthColors[strength]
-                                  : "bg-gray-200"
-                              }
-                            `}
+                            className={`h-full flex-1 rounded-full transition-colors ${
+                              strength >= step
+                                ? strengthClasses[strength]
+                                : "bg-muted"
+                            }`}
                           />
                         ))}
                       </div>
                     </div>
                   </FormControl>
-
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Confirm Password */}
             <FormField
               control={form.control}
               name="confirmPassword"
@@ -420,55 +274,27 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
                       placeholder="Confirm Password"
                       autoComplete="new-password"
                       {...field}
-                      className="
-                        h-10
-                        bg-white
-                        border-gray-200
-                        text-gray-900
-                        text-xs
-                        placeholder:text-gray-400
-                        focus:border-blue-500
-                        focus:ring-[#857938]/20
-                      "
+                      className="h-11 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </FormControl>
-
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Submit */}
             <Button
               type="submit"
               disabled={isPending}
-              className="
-                h-10
-                w-full
-                mt-2
-                flex
-                items-center
-                justify-center
-                gap-2
-                bg-blue-500
-                hover:bg-blue-600
-                text-white
-                font-semibold
-                text-xs
-                transition-all
-                shadow-md
-                shadow-[#857938]/20
-                cursor-pointer
-              "
+              className="mt-2 h-11 w-full rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
             >
               {isPending ? (
                 <>
-                  <Loader className="animate-spin" size={15} />
-                  Creating Account...
+                  <Loader className="h-4 w-4 animate-spin" />
+                  Creating account...
                 </>
               ) : (
                 <>
-                  <UserPlus size={15} />
+                  <UserPlus className="h-4 w-4" />
                   Continue as{" "}
                   {selectedRole === "Educator" ? "Educator" : "Learner"}
                 </>
@@ -477,34 +303,25 @@ export function SignupModal({ onSwitchToSignin, onSuccess }: SignupModalProps) {
           </form>
         </Form>
 
-        {/* Switch to Sign In */}
-        <div className="text-center pt-5 mt-5 border-t border-gray-100">
-          <p className="text-xs text-gray-500">
+        <div className="mt-6 border-t border-border pt-5 text-center">
+          <p className="text-xs text-muted-foreground">
             Already have an account?{" "}
-            <button
-              type="button"
-              onClick={onSwitchToSignin}
-              className="
-                inline-flex
-                items-center
-                gap-1
-                text-blue-500
-                font-semibold
-                hover:text-blue-600
-                transition-colors
-                cursor-pointer
-              "
-            >
-              <ArrowLeft size={13} />
-              Sign in
-            </button>
+            {onSwitchToSignin ? (
+              <button
+                type="button"
+                onClick={onSwitchToSignin}
+                className="inline-flex items-center gap-1 font-semibold text-primary transition-colors hover:underline"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Sign in
+              </button>
+            ) : null}
           </p>
         </div>
       </div>
 
-      {/* Bottom Banner */}
-      <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center rounded-b-xl">
-        <p className="text-[9px] text-gray-400 uppercase tracking-[0.2em]">
+      <div className="border-t border-border bg-muted/50 px-4 py-2.5 text-center">
+        <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
           Protected by SSL Encryption
         </p>
       </div>

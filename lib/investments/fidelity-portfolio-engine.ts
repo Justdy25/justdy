@@ -184,6 +184,9 @@ export function xirr(
   cashFlows: Array<{ date: Date | string; amount: number }>,
   guess = 0.1,
 ): number | null {
+  // Preserve the public optional parameter for existing callers.
+  void guess;
+
   if (cashFlows.length < 2) return null;
   const flows = cashFlows
     .map((flow) => ({ date: new Date(flow.date), amount: flow.amount }))
@@ -204,8 +207,6 @@ export function xirr(
   let low = -0.9999;
   let high = 10;
   let fLow = f(low);
-  let fHigh = f(high);
-  if (fLow * fHigh > 0) return null;
 
   for (let i = 0; i < 100; i += 1) {
     const mid = (low + high) / 2;
@@ -213,7 +214,6 @@ export function xirr(
     if (Math.abs(value) < 1e-8) return mid;
     if (fLow * value <= 0) {
       high = mid;
-      fHigh = value;
     } else {
       low = mid;
       fLow = value;

@@ -32,62 +32,6 @@ export const productType = [
    GRADE LEVELS
 ============================================================ */
 
-export const gradeLevels = [
-  {
-    value: "Grade1",
-    label: "Grade 1",
-  },
-  {
-    value: "Grade2",
-    label: "Grade 2",
-  },
-  {
-    value: "Grade3",
-    label: "Grade 3",
-  },
-  {
-    value: "Grade4",
-    label: "Grade 4",
-  },
-  {
-    value: "Grade5",
-    label: "Grade 5",
-  },
-  {
-    value: "Grade6",
-    label: "Grade 6",
-  },
-  {
-    value: "Grade7",
-    label: "Grade 7",
-  },
-  {
-    value: "Grade8",
-    label: "Grade 8",
-  },
-  {
-    value: "Grade9",
-    label: "Grade 9",
-  },
-  {
-    value: "Grade10",
-    label: "Grade 10",
-  },
-  {
-    value: "Grade11",
-    label: "Grade 11",
-  },
-  {
-    value: "Grade12",
-    label: "Grade 12",
-  },
-] as const;
-
-export const gradeLevelValues = gradeLevels.map((grade) => grade.value) as [
-  string,
-  ...string[],
-];
-
 /* ============================================================
    SUBJECTS
 ============================================================ */
@@ -177,18 +121,6 @@ export const productSchema = z.object({
      subjectId  = "cm..."
      topicId    = "cm..."
   ========================================================== */
-
-  gradeLevel: z.enum(gradeLevelValues, {
-    message: "Grade level is required",
-  }),
-
-  subjectId: z.string().min(1, {
-    message: "Subject is required",
-  }),
-
-  topicId: z.string().min(1, {
-    message: "Topic is required",
-  }),
 
   /* ==========================================================
      DIGITAL PRICE
@@ -325,12 +257,6 @@ export const topicSchema = z.object({
 
   description: z.string().optional().nullable(),
 
-  gradeLevel: z.enum(gradeLevelValues, {
-    message: "Grade level is required",
-  }),
-
-  subjectId: z.string().min(1, "Subject is required"),
-
   slug: z.string().min(1, "Topic slug is required"),
 });
 
@@ -387,12 +313,6 @@ export const createTopicSchema = z.object({
     .max(500, "Description is too long")
     .optional()
     .or(z.literal("")),
-
-  gradeLevel: z.enum(gradeLevelValues, {
-    message: "Grade level is required",
-  }),
-
-  subjectId: z.string().min(1, "Subject is required"),
 });
 
 export const updateTopicSchema = z.object({
@@ -410,12 +330,6 @@ export const updateTopicSchema = z.object({
     .max(500, "Description is too long")
     .optional()
     .or(z.literal("")),
-
-  gradeLevel: z.enum(gradeLevelValues, {
-    message: "Grade level is required",
-  }),
-
-  subjectId: z.string().min(1, "Subject is required"),
 });
 
 /* ============================================================

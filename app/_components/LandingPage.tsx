@@ -1,473 +1,670 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  Brain,
+  Check,
+  ChevronRight,
+  FileText,
+  GraduationCap,
+  Layers3,
+  MessageSquareText,
+  Sparkles,
+  Users,
+  Video,
+  WandSparkles,
+  Zap,
+} from "lucide-react";
+import MarketingNavbar from "./MarketingNavbar";
+import MarketingFooter from "./MarketingFooter";
+import { AuthModal } from "@/app/(auth)/AuthModal";
 
-interface LandingPageProps {
-  uploadthingImages?: string[];
-}
-
-const CAROUSEL_SLIDES = [
+const audiences = [
   {
-    id: 1,
-    image:
-      "https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=2048&auto=format&fit=crop",
-    alt: "Interactive learning resources",
+    icon: GraduationCap,
+    title: "Students",
+    description:
+      "Understand difficult topics, practice with personalized resources, and get help when you need it.",
   },
   {
-    id: 2,
-    image:
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2048&auto=format&fit=crop",
-    alt: "Educational worksheets",
+    icon: BookOpen,
+    title: "Teachers",
+    description:
+      "Create worksheets, lessons, quizzes, activities, and other teaching resources with AI.",
   },
   {
-    id: 3,
-    image:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=2048&auto=format&fit=crop",
-    alt: "Online tutoring",
+    icon: Users,
+    title: "Parents",
+    description:
+      "Give children better learning support with engaging resources and access to trusted tutoring.",
   },
   {
-    id: 4,
-    image:
-      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2048&auto=format&fit=crop",
-    alt: "Students learning",
-  },
-  {
-    id: 5,
-    image:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=2048&auto=format&fit=crop",
-    alt: "Learning resources and books",
+    icon: Layers3,
+    title: "Schools",
+    description:
+      "Bring AI-powered content creation, learning resources, and tutoring into one ecosystem.",
   },
 ];
 
-export default function LandingPageClient({
-  uploadthingImages,
-}: LandingPageProps) {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+const aiTools = [
+  {
+    icon: FileText,
+    title: "Worksheets",
+    description: "Generate polished, classroom-ready worksheets in minutes.",
+    href: "/create/worksheet",
+  },
+  {
+    icon: BookOpen,
+    title: "Lessons",
+    description: "Turn ideas and topics into structured learning experiences.",
+    href: "/create/lesson",
+  },
+  {
+    icon: Brain,
+    title: "Quizzes",
+    description:
+      "Create questions, practice activities, and assessments with AI.",
+    href: "/create/quiz",
+  },
+  {
+    icon: WandSparkles,
+    title: "More with AI",
+    description:
+      "Create videos, images, documents, audio, and other learning content.",
+    href: "/dashboard",
+  },
+];
 
-  // Auto rotate carousel
-  useEffect(() => {
-    if (isPaused) {
-      return;
-    }
+const steps = [
+  {
+    number: "01",
+    title: "Tell Justdy what you need",
+    description:
+      "Describe a topic, grade level, learning objective, lesson idea, or resource you want to create.",
+  },
+  {
+    number: "02",
+    title: "AI builds it for you",
+    description:
+      "Justdy transforms your idea into useful educational content that you can review and refine.",
+  },
+  {
+    number: "03",
+    title: "Teach, learn, or share",
+    description:
+      "Use your creation immediately, save it to your library, or turn to a tutor for live support.",
+  },
+];
 
-    const timer = window.setInterval(() => {
-      setCurrentSlide((previous) => {
-        return (previous + 1) % CAROUSEL_SLIDES.length;
-      });
-    }, 5000);
+export default function LandingPage() {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
 
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [isPaused]);
-
-  const previousSlide = () => {
-    setCurrentSlide((previous) => {
-      if (previous === 0) {
-        return CAROUSEL_SLIDES.length - 1;
-      }
-
-      return previous - 1;
-    });
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide((previous) => {
-      return (previous + 1) % CAROUSEL_SLIDES.length;
-    });
-  };
-
-  const selectSlide = (index: number) => {
-    setCurrentSlide(index);
+  const openSignup = () => {
+    setAuthMode("signup");
+    setAuthOpen(true);
   };
 
   return (
-    <section
-      className="w-full bg-white py-3 sm:py-5"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      <div className="relative mx-auto w-full max-w-7xl px-10 sm:px-14 md:px-16 lg:px-12">
-        {/* Carousel */}
-        <div className="relative aspect-[3.3/1] w-full overflow-hidden rounded-md bg-slate-100 shadow-md">
-          {CAROUSEL_SLIDES.map((slide, index) => (
-            <div
-              key={slide.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                index === currentSlide ? "z-10 opacity-100" : "z-0 opacity-0"
-              }`}
-            >
-              <Image
-                src={slide.image}
-                alt={slide.alt}
-                fill
-                priority={index === 0}
-                sizes="100vw"
-                className="object-cover object-center"
-              />
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
+      <MarketingNavbar />
+
+      <main>
+        {/* HERO */}
+        <section className="relative overflow-hidden border-b border-border bg-foreground">
+          <div className="absolute inset-0">
+            <div className="absolute left-[-10%] top-[-30%] h-[600px] w-[600px] rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="absolute right-[-10%] top-[5%] h-[500px] w-[500px] rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="absolute bottom-[-30%] left-[35%] h-[500px] w-[500px] rounded-full bg-violet-500/10 blur-3xl" />
+          </div>
+
+          <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-16 sm:px-8 lg:px-12 lg:pb-28 lg:pt-24">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-background/[0.06] px-4py-2 text-sm font-medium text-slate-200 backdrop-blur">
+                <Sparkles className="h-4 w-4 text-cyan-300" />
+                AI-powered learning and development
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+
+              <h1 className="text-balance text-5xl font-semibold tracking-[-0.04em] text-background sm:text-6xl lg:text-7xl">
+                Build better learning
+                <span className="block bg-gradient-to-r from-cyan-300 via-indigo-300 to-violet-300 bg-clip-text text-transparent">
+                  with AI and expert tutoring.
+                </span>
+              </h1>
+
+              <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
+                Justdy brings AI-powered educational creation, learning
+                resources, and live tutoring together in one modern learning
+                ecosystem.
+              </p>
+
+              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={openSignup}
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-background px-6 text-sm font-semibold text-foreground shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-background/90"
+                >
+                  Start creating with AI
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </button>
+
+                <Link
+                  href="/tutoring"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/15 bg-background/[0.06] px-6 text-sm font-semibold text-background backdrop-blur transition hover:bg-background/[0.1]"
+                >
+                  <Video className="h-4 w-4" />
+                  Find a tutor
+                </Link>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-2">
+                  <Check className="h-4 w-4 text-cyan-300" />
+                  Create faster
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <Check className="h-4 w-4 text-cyan-300" />
+                  Learn smarter
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <Check className="h-4 w-4 text-cyan-300" />
+                  Get expert help
+                </span>
+              </div>
             </div>
-          ))}
 
-          {/* Left navigation */}
-          <button
-            type="button"
-            onClick={previousSlide}
-            aria-label="Previous slide"
-            className="absolute left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition-all duration-200 hover:scale-105 hover:bg-white hover:text-blue-600 active:scale-95 sm:left-5 sm:h-12 sm:w-12"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
+            {/* PRODUCT PREVIEW */}
+            <div className="mx-auto mt-16 max-w-6xl">
+              <div className="rounded-3xl border border-white/10 bg-background/[0.06] p-2 shadow-2xl shadow-black/30 backdrop-blur">
+                <div className="overflow-hidden rounded-[22px] border border-border/10 bg-slate-900">
+                  <div className="flex h-12 items-center border-b border-white/10 px-4">
+                    <div className="flex gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-background/20" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-background/20" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-background/20" />
+                    </div>
 
-          {/* Right navigation */}
-          <button
-            type="button"
-            onClick={nextSlide}
-            aria-label="Next slide"
-            className="absolute right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition-all duration-200 hover:scale-105 hover:bg-white hover:text-blue-600 active:scale-95 sm:right-5 sm:h-12 sm:w-12"
-          >
-            <ChevronRight className="h-6 w-6" />
-          </button>
-        </div>
+                    <div className="mx-auto rounded-lg border border-white/10 bg-background/[0.04] px-4 py-1 text-xs text-muted-foreground">
+                      justdy.com
+                    </div>
 
-        {/* Pagination */}
-        <div className="mt-4 flex items-center justify-center gap-3">
-          {CAROUSEL_SLIDES.map((slide, index) => (
-            <button
-              key={slide.id}
-              type="button"
-              onClick={() => selectSlide(index)}
-              aria-label={`Go to slide ${index + 1}`}
-              aria-current={index === currentSlide}
-              className="flex items-center justify-center p-1"
-            >
-              <span
-                className={`block rounded-full transition-all duration-300 ${
-                  index === currentSlide
-                    ? "h-3 w-3 bg-blue-500"
-                    : "h-3 w-3 bg-slate-400 hover:bg-slate-500"
-                }`}
-              />
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
+                    <div className="w-10" />
+                  </div>
+
+                  <div className="grid min-h-[380px] lg:grid-cols-[220px_1fr]">
+                    <div className="hidden border-r border-white/10 bg-background/[0.025] p-5 lg:block">
+                      <div className="mb-7 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-foreground">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <span className="font-semibold text-background">
+                          Justdy
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {["AI Workspace", "Create", "Library", "Projects"].map(
+                          (item, index) => (
+                            <div
+                              key={item}
+                              className={`rounded-lg px-3 py-2 text-sm ${
+                                index === 0
+                                  ? "bg-background/10 text-background"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {item}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-6 sm:p-8">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-300">
+                            AI Workspace
+                          </p>
+                          <h2 className="mt-2 text-2xl font-semibold text-background">
+                            What would you like to create?
+                          </h2>
+                        </div>
+
+                        <div className="hidden rounded-xl border border-white/10 bg-background/[0.04] px-3 py-2 text-xs text-muted-foreground sm:block">
+                          AI Copilot
+                        </div>
+                      </div>
+
+                      <div className="mt-8 rounded-2xl border border-white/10 bg-background/[0.035] p-4">
+                        <div className="flex gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-brfrom-cyan-400 to-indigo-500 text-background">
+                            <Sparkles className="h-5 w-5" />
+                          </div>
+
+                          <div className="flex-1">
+                            <p className="text-sm leading-6 text-slate-300">
+                              Create a Grade 4 mathematics worksheet about
+                              fractions with examples, practice questions, and
+                              an answer key.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+                          <div className="flex gap-2">
+                            <span className="rounded-lg bg-background/5 px-3 py-1.5 text-xs text-muted-foreground">
+                              Grade 4
+                            </span>
+                            <span className="rounded-lg bg-background/5 px-3 py-1.5 text-xs text-muted-foreground">
+                              Mathematics
+                            </span>
+                          </div>
+
+                          <div className="rounded-lg bg-background px-4 py-2 text-xs font-semibold text-foreground">
+                            Generate
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                        {[
+                          ["Worksheet", "Create"],
+                          ["Lesson", "Build"],
+                          ["Quiz", "Generate"],
+                        ].map(([title, action]) => (
+                          <div
+                            key={title}
+                            className="rounded-xl border border-white/10 bg-background/[0.025] p-4"
+                          >
+                            <div className="text-sm font-medium text-background">
+                              {title}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {action} with AI
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* POSITIONING */}
+        <section className="border-b border-border bg-background">
+          <div className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-12">
+            <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                  One ecosystem
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  Everything you need to move learning forward.
+                </h2>
+              </div>
+
+              <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
+                From creating educational content with AI to finding a tutor for
+                one-on-one support, Justdy connects the tools people need to
+                create, teach, learn, practice, and grow.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* AUDIENCES */}
+        <section className="bg-muted/40">
+          <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                Built for education
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                One platform. Different learning needs.
+              </h2>
+              <p className="mt-4 text-lg leading-8 text-muted-foreground">
+                Justdy supports the people who make learning happen every day.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {audiences.map((audience) => {
+                const Icon = audience.icon;
+
+                return (
+                  <div
+                    key={audience.title}
+                    className="group rounded-2xl border border-border bg-background p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background">
+                      <Icon className="h-5 w-5" />
+                    </div>
+
+                    <h3 className="mt-5 text-lg font-semibold text-foreground">
+                      {audience.title}
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {audience.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* AI CREATION */}
+        <section className="bg-background">
+          <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+            <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+              <div>
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+
+                <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                  Justdy AI
+                </p>
+
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  Turn an idea into an educational resource.
+                </h2>
+
+                <p className="mt-5 text-lg leading-8 text-muted-foreground">
+                  Stop starting from a blank page. Use AI to create useful
+                  educational materials faster, then refine them to fit your
+                  exact needs.
+                </p>
+
+                <Link
+                  href="/dashboard"
+                  className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
+                >
+                  Explore AI creation
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {aiTools.map((tool) => {
+                  const Icon = tool.icon;
+
+                  return (
+                    <Link
+                      key={tool.title}
+                      href={tool.href}
+                      className="group rounded-2xl border border-border bg-background p-6 shadow-sm transition hover:-translate-y-1 hover:border-border hover:shadow-xl"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-foreground">
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-muted-foreground" />
+                      </div>
+
+                      <h3 className="mt-5 font-semibold text-foreground">
+                        {tool.title}
+                      </h3>
+
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {tool.description}
+                      </p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS */}
+        <section className="border-y border-border bg-muted/40">
+          <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                Simple workflow
+              </p>
+
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                From idea to impact in minutes.
+              </h2>
+            </div>
+
+            <div className="mt-14 grid gap-5 md:grid-cols-3">
+              {steps.map((step) => (
+                <div
+                  key={step.number}
+                  className="relative rounded-2xl border border-border bg-background p-7"
+                >
+                  <span className="text-sm font-bold text-indigo-600">
+                    {step.number}
+                  </span>
+
+                  <h3 className="mt-5 text-xl font-semibold text-foreground">
+                    {step.title}
+                  </h3>
+
+                  <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* TUTORING */}
+        <section className="bg-background">
+          <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+            <div className="overflow-hidden rounded-3xl bg-foreground">
+              <div className="grid lg:grid-cols-2">
+                <div className="p-8 sm:p-12 lg:p-14">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background text-foreground">
+                    <Video className="h-5 w-5" />
+                  </div>
+
+                  <p className="mt-7 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">
+                    Live tutoring
+                  </p>
+
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-background sm:text-4xl">
+                    When AI isn&apos;t enough, get a real person.
+                  </h2>
+
+                  <p className="mt-5 text-lg leading-8 text-slate-300">
+                    Book a live one-on-one tutoring session with a verified
+                    tutor. Learn face-to-face with live video and a shared
+                    whiteboard.
+                  </p>
+
+                  <Link
+                    href="/tutoring"
+                    className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-muted"
+                  >
+                    Book live tutoring
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                <div className="relative min-h-[330px] overflow-hidden border-t border-white/10 lg:border-l lg:border-t-0">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-transparent to-cyan-400/10" />
+
+                  <div className="absolute left-8 top-10 w-[calc(100%-4rem)] rounded-2xl border border-white/10 bg-background/[0.06] p-5 shadow-2xl backdrop-blur">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Upcoming session
+                        </p>
+                        <p className="mt-1 font-semibold text-background">
+                          Mathematics · Grade 6
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-300">
+                        Scheduled
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+                        <p className="text-xs text-muted-foreground">Tutor</p>
+                        <p className="mt-1 text-sm font-medium text-background">
+                          Verified tutor
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+                        <p className="text-xs text-muted-foreground">Format</p>
+                        <p className="mt-1 text-sm font-medium text-background">
+                          Live video
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-background/[0.03] px-4 py-3">
+                      <MessageSquareText className="h-4 w-4 text-cyan-300" />
+                      <span className="text-xs text-muted-foreground">
+                        Shared whiteboard available during the session
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-[-35px] right-[-35px] h-40 w-40 rounded-full border border-cyan-300/10 bg-cyan-300/5 blur-2xl" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* RESOURCE ECOSYSTEM */}
+        <section className="bg-muted/40">
+          <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+            <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                  Learning resources
+                </p>
+
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  Discover resources that make learning easier.
+                </h2>
+
+                <p className="mt-5 text-lg leading-8 text-muted-foreground">
+                  Combine AI-powered creation with quality educational
+                  resources. Find materials for teaching, practice, revision,
+                  and continued learning.
+                </p>
+
+                <Link
+                  href="/products"
+                  className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
+                >
+                  Explore resources
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  {
+                    icon: FileText,
+                    title: "Worksheets",
+                    text: "Practice and printable resources",
+                  },
+                  {
+                    icon: BookOpen,
+                    title: "Learning content",
+                    text: "Resources for different needs",
+                  },
+                  {
+                    icon: Brain,
+                    title: "AI-generated",
+                    text: "Create exactly what you need",
+                  },
+                  {
+                    icon: Zap,
+                    title: "Instant access",
+                    text: "Get started without the wait",
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl border border-border bg-background p-5 shadow-sm"
+                    >
+                      <Icon className="h-5 w-5 text-indigo-600" />
+
+                      <h3 className="mt-4 text-sm font-semibold text-foreground">
+                        {item.title}
+                      </h3>
+
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {item.text}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FINAL CTA */}
+        <section className="bg-background">
+          <div className="mx-auto max-w-5xl px-6 py-24 text-center sm:px-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-lg">
+              <Sparkles className="h-6 w-6" />
+            </div>
+
+            <h2 className="mt-7 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              The future of learning starts with a better toolkit.
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-muted-foreground">
+              Create with AI, discover educational resources, and connect with
+              tutors—all through one learning ecosystem.
+            </p>
+
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={openSignup}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-foreground px-6 text-sm font-semibold text-background transition hover:bg-foreground/90"
+              >
+                Start with Justdy
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <Link
+                href="/tutoring"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-background px-6 text-sm font-semibold text-foreground transition hover:bg-muted/40"
+              >
+                Explore tutoring
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <MarketingFooter />
+
+      <AuthModal
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        defaultMode={authMode}
+      />
+    </div>
   );
 }
-
-// "use client";
-
-// import { useState, useEffect } from "react";
-// import { ArrowRight, Sparkles, Compass, Check } from "lucide-react";
-// import Link from "next/link";
-// import Image from "next/image";
-
-// interface LandingPageProps {
-//   uploadthingImages?: string[];
-// }
-
-// const CAROUSEL_IMAGES = [
-//   {
-//     url: "https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=1200&auto=format&fit=crop",
-//     alt: "Online math tutoring and digital workspace products",
-//   },
-//   {
-//     url: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=1200&auto=format&fit=crop",
-//     alt: "Printable workbooks and study planners for students",
-//   },
-//   {
-//     url: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1200&auto=format&fit=crop",
-//     alt: "Interactive digital learning sessions and online tutoring",
-//   },
-// ];
-
-// export default function LandingPageClient({}: LandingPageProps) {
-//   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-//   useEffect(() => {
-//     const timer = setInterval(() => {
-//       setCurrentImageIndex(
-//         (prevIndex) => (prevIndex + 1) % CAROUSEL_IMAGES.length,
-//       );
-//     }, 4500);
-
-//     return () => clearInterval(timer);
-//   }, []);
-
-//   return (
-//     <div className="relative overflow-x-hidden font-sans antialiased text-slate-900 selection:bg-emerald-500 selection:text-white">
-//       {/* ================================================================ */}
-//       {/* BACKGROUND                                                       */}
-//       {/* ================================================================ */}
-
-//       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-//         <div
-//           className="absolute inset-0 bg-[radial-gradient(#000_0px,transparent_1px)] bg-size-[15px_15px]"
-//           style={{
-//             maskImage:
-//               "radial-gradient(ellipse 60% 50% at 50% 0%, #000 70%, transparent 100%)",
-//             WebkitMaskImage:
-//               "radial-gradient(ellipse 60% 50% at 50% 0%, #000 70%, transparent 100%)",
-//           }}
-//         />
-//       </div>
-
-//       {/* ================================================================ */}
-//       {/* MAIN CONTAINER                                                   */}
-//       {/* ================================================================ */}
-
-//       <main
-//         className="
-//           relative
-//           z-10
-//           mx-auto
-//           max-w-8xl
-//           px-4
-//           py-5
-//           sm:px-6
-//           lg:px-28
-//         "
-//       >
-//         <div className="grid grid-cols-1 items-stretch gap-8">
-//           {/* ============================================================ */}
-//           {/* HERO CARD                                                     */}
-//           {/* ============================================================ */}
-
-//           <div
-//             className="
-//               relative
-//               flex
-//               flex-col
-//               justify-between
-//               overflow-hidden
-//               rounded-md
-//               border
-//               border-emerald-500/20
-//               bg-linear-to-br
-//               bg-emerald-900/20
-//               p-5
-//               shadow-2xl
-//               shadow-emerald-950/20
-//               sm:p-8
-//             "
-//           >
-//             {/* ========================================================== */}
-//             {/* AMBIENT GLOW                                                */}
-//             {/* ========================================================== */}
-
-//             <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
-
-//             <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
-
-//             {/* ========================================================== */}
-//             {/* DESKTOP IMAGE CAROUSEL                                      */}
-//             {/* ========================================================== */}
-
-//             <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-20 hidden w-[55%] items-center justify-end sm:flex">
-//               <div
-//                 className="relative h-full w-full overflow-hidden bg-slate-900 shadow-2xl"
-//                 style={{
-//                   clipPath: "polygon(30% 0%, 100% 0%, 100% 100%, 0% 100%)",
-//                 }}
-//               >
-//                 {/* Image overlay */}
-//                 <div className="absolute inset-0 z-10 bg-linear-to-r from-slate-950/95 via-slate-950/30 to-transparent" />
-
-//                 {CAROUSEL_IMAGES.map((img, index) => (
-//                   <div
-//                     key={img.url}
-//                     className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-//                       index === currentImageIndex
-//                         ? "z-1 opacity-100"
-//                         : "z-0 opacity-0"
-//                     }`}
-//                   >
-//                     <Image
-//                       src={img.url}
-//                       alt={img.alt}
-//                       fill
-//                       priority={index === 0}
-//                       className="transform object-cover object-center scale-105"
-//                     />
-//                   </div>
-//                 ))}
-//               </div>
-//             </div>
-
-//             {/* ========================================================== */}
-//             {/* FLOATING BADGES                                             */}
-//             {/* ========================================================== */}
-
-//             <div className="pointer-events-auto absolute bottom-6 right-8 z-30 hidden items-center gap-3 lg:right-30 lg:flex">
-//               <div className="flex items-center gap-3 rounded-md border border-emerald-500/40 bg-blue-600 px-6 py-3 text-white shadow-2xl backdrop-blur-2xl transition-transform duration-300 hover:scale-105">
-//                 <div className="rounded-lg bg-blue-500 p-2 text-emerald-400 shadow-inner">
-//                   <Sparkles className="size-4" />
-//                 </div>
-
-//                 <div>
-//                   <div className="text-xs font-bold tracking-wide text-white">
-//                     Top Rated
-//                   </div>
-
-//                   <p className="text-[11px] font-medium text-slate-300">
-//                     Expert-led paths
-//                   </p>
-//                 </div>
-//               </div>
-
-//               <div className="flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-blue-600 px-6 py-3 text-white shadow-2xl backdrop-blur-2xl transition-transform duration-300 hover:scale-105">
-//                 <div className="rounded-lg bg-blue-500 p-2 text-emerald-400 shadow-inner">
-//                   <Sparkles className="size-4" />
-//                 </div>
-
-//                 <div>
-//                   <div className="text-xs font-bold tracking-wide text-white">
-//                     Printables
-//                   </div>
-
-//                   <p className="text-[11px] font-medium text-slate-300">
-//                     Workbooks, planners, and more
-//                   </p>
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* ========================================================== */}
-//             {/* LEFT CONTENT                                                */}
-//             {/* ========================================================== */}
-
-//             <div className="relative z-10 max-w-4xl pr-0 sm:pr-80 lg:pr-96">
-//               <h1 className="mb-5 text-3xl font-extrabold leading-[1.1] tracking-tight text-blue-600 sm:mb-6 sm:text-3xl lg:text-5xl">
-//                 Learn. Create. Grow.
-//               </h1>
-
-//               <p className="mb-5 text-base font-normal leading-relaxed text-slate-700 sm:text-[16px]">
-//                 Discover quality learning materials that makes learning
-//                 engaging, fun, and productive, as well as quality one-on-one
-//                 tutoring from experts.
-//               </p>
-
-//               {/* ======================================================== */}
-//               {/* ACTION BUTTONS                                            */}
-//               {/* ======================================================== */}
-
-//               <div className="mb-6 flex w-full flex-col items-stretch justify-start gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
-//                 <Link
-//                   href="/free-assessment"
-//                   className="
-//                     inline-flex
-//                     h-12
-//                     w-full
-//                     items-center
-//                     justify-center
-//                     gap-2.5
-//                     rounded-md
-//                     border
-//                     border-emerald-400/40
-//                     bg-blue-500
-//                     px-6
-//                     text-base
-//                     font-extrabold
-//                     text-white
-//                     shadow-xl
-//                     shadow-emerald-500/30
-//                     transition-all
-//                     duration-300
-//                     hover:-translate-y-0.5
-//                     hover:bg-blue-600
-//                     active:translate-y-0
-//                     sm:w-auto
-//                   "
-//                 >
-//                   <Sparkles className="size-4 text-white" />
-
-//                   <span>Free Assessment</span>
-
-//                   <ArrowRight className="ml-0.5 size-4 text-white" />
-//                 </Link>
-
-//                 <Link
-//                   href="/videos"
-//                   className="
-//                     inline-flex
-//                     h-12
-//                     w-full
-//                     items-center
-//                     justify-center
-//                     gap-2.5
-//                     rounded-md
-//                     border
-//                     border-blue-500
-//                     px-6
-//                     text-base
-//                     font-semibold
-//                     text-blue-600
-//                     shadow-lg
-//                     transition-all
-//                     duration-300
-//                     hover:border-blue-600
-//                     hover:text-white
-//                     active:translate-y-0
-//                     sm:w-auto
-//                   "
-//                 >
-//                   <Compass className="size-4 text-blue-500" />
-
-//                   <span>Free Lesson Videos</span>
-//                 </Link>
-//               </div>
-
-//               {/* ======================================================== */}
-//               {/* FEATURE TAGS                                             */}
-//               {/* ======================================================== */}
-
-//               <div className="flex flex-wrap items-start gap-0 sm:gap-1">
-//                 <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-800 backdrop-blur-sm sm:px-3">
-//                   <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-blue-500">
-//                     <Check className="size-3 text-white" />
-//                   </div>
-
-//                   <span>Instant Downloads</span>
-//                 </div>
-
-//                 <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-800 backdrop-blur-sm sm:px-3">
-//                   <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-blue-500">
-//                     <Check className="size-3 text-white" />
-//                   </div>
-
-//                   <span>Secured Payments</span>
-//                 </div>
-
-//                 <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-800 backdrop-blur-sm sm:px-3">
-//                   <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-blue-500">
-//                     <Check className="size-3 text-white" />
-//                   </div>
-
-//                   <span>Learn Anywhere</span>
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* ========================================================== */}
-//             {/* MOBILE IMAGE                                                */}
-//             {/* ========================================================== */}
-
-//             <div className="relative z-10 mt-7 flex justify-center sm:hidden">
-//               <div className="relative h-48 w-full overflow-hidden rounded-xl border border-emerald-500/30 bg-slate-900 shadow-2xl">
-//                 <Image
-//                   src={CAROUSEL_IMAGES[currentImageIndex].url}
-//                   alt={CAROUSEL_IMAGES[currentImageIndex].alt}
-//                   fill
-//                   className="object-cover object-center transition-opacity duration-500"
-//                 />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useId,
+} from "react";
 import {
   Circle,
   Copy,
@@ -123,9 +130,34 @@ type FormulaCategory =
 
 type WhiteboardMode = "standalone" | "appointment";
 
+export type WhiteboardRealtimeData = {
+  version: number;
+  whiteboardId?: string;
+  mode?: WhiteboardMode;
+  appointmentId?: string;
+  pages: WhiteboardPage[];
+  currentPageIndex: number;
+  showGrid: boolean;
+  backgroundColor: string;
+  backgroundImage: string | null;
+  gridColor: string;
+  snapToGrid: boolean;
+  color: string;
+  width: number;
+  tool: Tool;
+  formulaCategory: FormulaCategory;
+  savedAt?: string;
+  /** Runtime-only realtime ordering metadata. */
+  realtimeOriginId?: string;
+  realtimeRevision?: number;
+};
+
 type WhiteboardProps = {
   mode: WhiteboardMode;
   appointmentId?: string;
+  onRealtimeChange?: (data: WhiteboardRealtimeData) => void;
+  onReady?: (data: WhiteboardRealtimeData) => void;
+  remoteData?: WhiteboardRealtimeData | null;
 };
 
 type SavedWhiteboardData = {
@@ -145,6 +177,8 @@ type SavedWhiteboardData = {
   tool?: Tool;
   formulaCategory?: FormulaCategory;
   savedAt?: string;
+  realtimeOriginId?: string;
+  realtimeRevision?: number;
 };
 
 const FORMULA_CATEGORIES: readonly FormulaCategory[] = [
@@ -232,6 +266,14 @@ function parseSavedBoardData(value: unknown): SavedWhiteboardData | null {
       : undefined,
     savedAt:
       typeof candidate.savedAt === "string" ? candidate.savedAt : undefined,
+    realtimeOriginId:
+      typeof candidate.realtimeOriginId === "string"
+        ? candidate.realtimeOriginId
+        : undefined,
+    realtimeRevision:
+      typeof candidate.realtimeRevision === "number"
+        ? candidate.realtimeRevision
+        : undefined,
   };
 }
 
@@ -741,7 +783,13 @@ function translateElement(
   return { ...element, x: element.x + dx, y: element.y + dy };
 }
 
-export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
+export default function Whiteboard({
+  mode,
+  appointmentId,
+  onRealtimeChange,
+  onReady,
+  remoteData,
+}: WhiteboardProps) {
   const [databaseWhiteboardId, setDatabaseWhiteboardId] = useState<
     string | null
   >(null);
@@ -752,6 +800,12 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const hasLoadedBoardRef = useRef(false);
+  const realtimeReadyReportedRef = useRef(false);
+  const realtimeOriginId = useId();
+  const realtimeOriginIdRef = useRef<string>(realtimeOriginId);
+  const realtimeRevisionRef = useRef(0);
+  const lastAppliedRemoteSignatureRef = useRef<string | null>(null);
+  const lastRemoteRevisionByOriginRef = useRef<Map<string, number>>(new Map());
 
   const storageKey = useMemo(() => {
     if (mode === "standalone") {
@@ -933,7 +987,7 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
     index: null,
     name: "",
   });
-  const [isSaved, setIsSaved] = useState(false);
+  const [, setIsSaved] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -943,7 +997,7 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
   );
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
-  const [imageVersion, setImageVersion] = useState(0);
+  const [, setImageVersion] = useState(0);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [textEditor, setTextEditor] = useState<{
@@ -1706,10 +1760,10 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
     drawStroke,
     drawText,
     drawSelection,
+    drawSelectionGroup,
     elements,
-    getSelectedElement,
+    getSelectedElements,
     resizeCanvas,
-    imageVersion,
   ]);
 
   // backgroundImageVersion is intentionally a render trigger. The image is
@@ -2153,7 +2207,7 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
         duplicateSelectedElement();
       }
     },
-    [duplicateSelectedElement, elements, selectedElementId, tool],
+    [duplicateSelectedElement, elements, getPoint, selectedElementId, tool],
   );
 
   const handleCanvasDoubleClick = useCallback(
@@ -2817,6 +2871,7 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
 
     const initializeWhiteboard = async () => {
       hasLoadedBoardRef.current = false;
+      realtimeReadyReportedRef.current = false;
       setWhiteboardReady(false);
 
       const id = await resolveWhiteboard();
@@ -2873,6 +2928,135 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
       cancelled = true;
     };
   }, [mode, appointmentId, resolveWhiteboard, applyBoardData, storageKey]);
+
+  const buildRealtimeData = useCallback(
+    (revision = realtimeRevisionRef.current): WhiteboardRealtimeData => ({
+      version: 1,
+      whiteboardId: databaseWhiteboardId ?? undefined,
+      mode,
+      appointmentId,
+      pages,
+      currentPageIndex,
+      showGrid,
+      backgroundColor,
+      backgroundImage,
+      gridColor,
+      snapToGrid,
+      color,
+      width,
+      tool,
+      formulaCategory,
+      savedAt: new Date().toISOString(),
+      realtimeOriginId: realtimeOriginIdRef.current,
+      realtimeRevision: revision,
+    }),
+    [
+      databaseWhiteboardId,
+      mode,
+      appointmentId,
+      pages,
+      currentPageIndex,
+      showGrid,
+      backgroundColor,
+      backgroundImage,
+      gridColor,
+      snapToGrid,
+      color,
+      width,
+      tool,
+      formulaCategory,
+    ],
+  );
+
+  const getRealtimeSignature = useCallback((data: WhiteboardRealtimeData) => {
+    return JSON.stringify({
+      whiteboardId: data.whiteboardId,
+      mode: data.mode,
+      appointmentId: data.appointmentId,
+      pages: data.pages,
+      currentPageIndex: data.currentPageIndex,
+      showGrid: data.showGrid,
+      backgroundColor: data.backgroundColor,
+      backgroundImage: data.backgroundImage,
+      gridColor: data.gridColor,
+      snapToGrid: data.snapToGrid,
+      color: data.color,
+      width: data.width,
+      tool: data.tool,
+      formulaCategory: data.formulaCategory,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!remoteData || !whiteboardReady || !hasLoadedBoardRef.current) return;
+
+    if (remoteData.realtimeOriginId === realtimeOriginIdRef.current) return;
+
+    const remoteOrigin = remoteData.realtimeOriginId;
+    const remoteRevision = remoteData.realtimeRevision;
+
+    if (remoteOrigin && typeof remoteRevision === "number") {
+      const lastRevision =
+        lastRemoteRevisionByOriginRef.current.get(remoteOrigin);
+      if (typeof lastRevision === "number" && remoteRevision <= lastRevision) {
+        return;
+      }
+      lastRemoteRevisionByOriginRef.current.set(remoteOrigin, remoteRevision);
+    }
+
+    const signature = getRealtimeSignature(remoteData);
+    if (signature === lastAppliedRemoteSignatureRef.current) return;
+
+    lastAppliedRemoteSignatureRef.current = signature;
+    applyBoardData(remoteData);
+  }, [remoteData, whiteboardReady, applyBoardData, getRealtimeSignature]);
+
+  useEffect(() => {
+    if (!databaseWhiteboardId || !whiteboardReady || !hasLoadedBoardRef.current)
+      return;
+
+    const realtimeData = buildRealtimeData(realtimeRevisionRef.current);
+    const signature = getRealtimeSignature(realtimeData);
+
+    if (signature === lastAppliedRemoteSignatureRef.current) {
+      lastAppliedRemoteSignatureRef.current = null;
+      return;
+    }
+
+    realtimeRevisionRef.current += 1;
+    onRealtimeChange?.(buildRealtimeData(realtimeRevisionRef.current));
+  }, [
+    databaseWhiteboardId,
+    whiteboardReady,
+    pages,
+    currentPageIndex,
+    showGrid,
+    backgroundColor,
+    backgroundImage,
+    gridColor,
+    snapToGrid,
+    color,
+    width,
+    tool,
+    formulaCategory,
+    buildRealtimeData,
+    getRealtimeSignature,
+    onRealtimeChange,
+  ]);
+
+  useEffect(() => {
+    if (
+      !databaseWhiteboardId ||
+      !whiteboardReady ||
+      !hasLoadedBoardRef.current ||
+      realtimeReadyReportedRef.current
+    ) {
+      return;
+    }
+
+    realtimeReadyReportedRef.current = true;
+    onReady?.(buildRealtimeData());
+  }, [databaseWhiteboardId, whiteboardReady, buildRealtimeData, onReady]);
 
   useEffect(() => {
     if (!databaseWhiteboardId || !whiteboardReady || !hasLoadedBoardRef.current)
@@ -3504,6 +3688,7 @@ export default function Whiteboard({ mode, appointmentId }: WhiteboardProps) {
                     title={opt.label}
                     aria-label={`Use ${opt.label} background`}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={opt.value}
                       alt={opt.label}

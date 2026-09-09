@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import type { WorksheetDocument } from "@/lib/ai/worksheet/schema";
-import type { WorksheetDesign } from "@/lib/ai/worksheet/worksheet-design";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { WorksheetDesign } from "@/lib/ai/worksheet/worksheet-design";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -55,7 +55,7 @@ export default function WorksheetPdfPreview({
   );
 
   useEffect(() => {
-    if (!worksheet || !requestPayload) {
+    if (!worksheet) {
       return;
     }
 
@@ -88,12 +88,11 @@ export default function WorksheetPdfPreview({
 
         if (requestId !== requestIdRef.current) {
           URL.revokeObjectURL(objectUrl);
-          objectUrl = null;
           return;
         }
 
         setPdfUrl((previous) => {
-          if (previous && previous !== objectUrl) {
+          if (previous) {
             URL.revokeObjectURL(previous);
           }
           return objectUrl;
@@ -117,21 +116,19 @@ export default function WorksheetPdfPreview({
     }
 
     const debounceTimer = window.setTimeout(() => {
-      void loadPreviewPdf();
+      loadPreviewPdf();
     }, 250);
 
     return () => {
       window.clearTimeout(debounceTimer);
       controller.abort();
-
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
-        objectUrl = null;
       }
     };
   }, [requestPayload, worksheet]);
 
-  function calculateFitZoom() {
+  const calculateFitZoom = useCallback(() => {
     const container = containerRef.current;
     if (!container) {
       return;
@@ -139,18 +136,19 @@ export default function WorksheetPdfPreview({
 
     const availableWidth = Math.max(280, container.clientWidth - 48);
     const nextFitZoom = Math.min(1, availableWidth / LETTER_WIDTH_PX);
-    const resolvedZoom = Math.max(nextFitZoom, 0.45);
 
-    setFitZoom(resolvedZoom);
-    onFitZoom(resolvedZoom);
-  }
+    setFitZoom(Math.max(nextFitZoom, 0.45));
+    const nextZoom = Math.max(nextFitZoom, 0.45);
+    onFitZoom(nextZoom);
+    onZoomChange(nextZoom);
+  }, [containerRef, onFitZoom, onZoomChange]);
 
   useEffect(() => {
     if (!pdfUrl) {
       return;
     }
 
-    const frameId = window.requestAnimationFrame(calculateFitZoom);
+    calculateFitZoom();
 
     const observer = new ResizeObserver(() => {
       if (manualZoom === null) {
@@ -162,11 +160,8 @@ export default function WorksheetPdfPreview({
       observer.observe(containerRef.current);
     }
 
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      observer.disconnect();
-    };
-  }, [pdfUrl, manualZoom, containerRef, onFitZoom]);
+    return () => observer.disconnect();
+  }, [pdfUrl, manualZoom, calculateFitZoom, containerRef]);
 
   function handleDocumentLoadSuccess(pdf: PDFDocumentProxy) {
     setNumPages(pdf.numPages);

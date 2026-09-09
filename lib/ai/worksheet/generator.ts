@@ -2,137 +2,72 @@ import { openai } from "@/lib/openai";
 
 import { WorksheetDocumentSchema } from "./schema";
 
-import type { WorksheetQuestionType, WorksheetDifficulty } from "./types";
+import type { ProjectContext } from "@/lib/ai/project-context";
 
 export interface GenerateWorksheetInput {
+  prompt?: string;
+
   gradeLevel: string;
-
   subject: string;
-
   topic: string;
-
   title?: string;
-
   learningObjective?: string;
-
   questionCount: number;
-
-  difficulty: WorksheetDifficulty;
-
-  questionTypes: WorksheetQuestionType[];
-
+  difficulty: string;
+  questionTypes: string[];
   instructions?: string;
+
+  projectContext?: ProjectContext | null;
 }
 
 function buildWorksheetPrompt(input: GenerateWorksheetInput): string {
+  const projectContext = input.projectContext;
+
+  const projectContextBlock =
+    projectContext &&
+    (projectContext.instructions ||
+      projectContext.audience ||
+      projectContext.gradeLevel ||
+      projectContext.subject ||
+      projectContext.preferences)
+      ? `
+PROJECT CONTEXT
+
+Use the following project context as standing guidance for this worksheet.
+
+${
+  projectContext.instructions
+    ? `Instructions: ${projectContext.instructions}`
+    : ""
+}
+
+${projectContext.audience ? `Audience: ${projectContext.audience}` : ""}
+
+${projectContext.gradeLevel ? `Grade level: ${projectContext.gradeLevel}` : ""}
+
+${projectContext.subject ? `Subject: ${projectContext.subject}` : ""}
+
+${
+  projectContext.preferences ? `Preferences: ${projectContext.preferences}` : ""
+}
+
+Rules:
+- Treat the project context as persistent guidance.
+- The current worksheet request remains the primary task.
+- Do not interpret the project context as an additional user request.
+- When the user's request explicitly conflicts with project context, follow the explicit current request.
+`
+      : "";
+
   return `
-You are the educational content engine for Justdy Learning.
+${projectContextBlock}
 
-Create a professional, accurate, age-appropriate printable educational worksheet.
+CURRENT WORKSHEET REQUEST
 
-STUDENT INFORMATION
 
-Grade:
-${input.gradeLevel}
+${input.prompt ?? ""}
 
-Subject:
-${input.subject}
-
-Topic:
-${input.topic}
-
-WORKSHEET TITLE:
-${input.title || input.topic}
-
-LEARNING OBJECTIVE:
-${
-  input.learningObjective ||
-  `Students will develop understanding and proficiency in ${input.topic}.`
-}
-
-NUMBER OF QUESTIONS:
-${input.questionCount}
-
-DIFFICULTY:
-${input.difficulty}
-
-ALLOWED QUESTION TYPES:
-${input.questionTypes.join(", ")}
-
-INSTRUCTIONS:
-${
-  input.instructions ||
-  "Read each question carefully and show your work where appropriate."
-}
-
-CONTENT REQUIREMENTS
-
-1. Create exactly ${input.questionCount} questions.
-
-2. Every question must be appropriate for:
-${input.gradeLevel}
-
-3. Every question must directly relate to:
-${input.topic}
-
-4. Do not create duplicate questions.
-
-5. Questions must be clear and unambiguous.
-
-6. Do not use unnecessarily advanced vocabulary.
-
-7. Multiple-choice questions must contain exactly four options.
-
-8. Multiple-choice options must be distinct.
-
-9. Every multiple-choice question must have exactly one correct answer.
-
-10. Do not reveal the answer inside the question.
-
-11. Use correct mathematical notation when mathematics is involved.
-
-12. Do not invent facts.
-
-13. Every question must have a valid answer.
-
-14. The answer key must correspond exactly to the questions.
-
-15. Assign reasonable point values.
-
-16. totalPoints must equal the sum of all question points.
-
-17. Question numbers must start at 1 and increase sequentially.
-
-18. Answer-key question numbers must match the worksheet questions exactly.
-
-19. Keep explanations concise but useful.
-
-20. The worksheet should feel professionally authored rather than generic AI output.
-
-QUESTION TYPE RULES
-
-multiple_choice:
-- exactly four options
-- one correct answer
-
-true_false:
-- answer must be "True" or "False"
-
-short_answer:
-- provide a concise expected answer
-
-fill_in_blank:
-- provide the expected missing answer
-
-matching:
-- provide the correct matching answer
-
-open_response:
-- provide a suitable model answer
-
-IMPORTANT
-
-Return ONLY valid JSON matching the required structure.
+Create the worksheet according to the requirements above.
 `;
 }
 

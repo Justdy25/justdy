@@ -2,33 +2,27 @@
 
 import { createAuthClient } from "better-auth/react";
 import { adminClient } from "better-auth/client/plugins";
-import { nextCookies } from "better-auth/next-js";
 
 export const authClient = createAuthClient({
   /*
-   * Do NOT set baseURL here.
+   * The authentication API is served by this same Next.js
+   * application.
    *
-   * The authentication API is hosted by the same Next.js application
-   * as the frontend. Better Auth will therefore use the current browser
-   * origin automatically.
+   * Because the frontend and Better Auth API share the same origin,
+   * Better Auth automatically uses:
    *
-   * Production:
-   * https://www.justdy.com/api/auth/...
+   *   http://localhost:3000/api/auth/*
    *
-   * Local:
-   * http://localhost:3000/api/auth/...
+   * locally, and:
    *
-   * This prevents:
-   * https://www.justdy.com
-   *       ↓
-   * https://justdy.com
-   *       ↓ 308 redirect
-   * https://www.justdy.com
+   *   https://www.justdy.com/api/auth/*
    *
-   * which was causing the CORS/preflight failure.
+   * in production.
+   *
+   * Do not hard-code www.justdy.com here because that would cause
+   * localhost development requests to leave the current origin.
    */
-
-  plugins: [adminClient(), nextCookies()],
+  plugins: [adminClient()],
 });
 
 export const { signIn, signOut, signUp, useSession } = authClient;

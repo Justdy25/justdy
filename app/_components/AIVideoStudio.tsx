@@ -1,5 +1,5 @@
 "use client";
-
+import ProjectContextIndicator from "@/app/_components/ProjectContextIndicator";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Clapperboard,
@@ -18,19 +18,6 @@ import {
   CreditCard,
 } from "lucide-react";
 
-import { CreateVideoGeneration } from "../actions/manage-ai-video";
-
-import {
-  GetAIVideoSubjects,
-  GetAIVideoTopics,
-} from "../actions/manage-ai-video-data";
-
-import { GetMyAIVideoCreditBalance } from "../actions/manage-ai-video-credits";
-
-import { getAIVideoCreditCost } from "@/lib/ai-video-pricing";
-
-import { GradeLevel } from "@/lib/generated/prisma/enums";
-
 /* ============================================================
    TYPES
 ============================================================ */
@@ -42,112 +29,162 @@ type GenerationStatus =
   | "FAILED"
   | "CANCELLED";
 
+type VideoModel = "sora-2" | "sora-2-pro";
+
+type VideoDuration = 4 | 8 | 12;
+
+type VideoAspectRatio = "16:9" | "9:16";
+
 type VideoItem = {
   id: string;
   title: string;
-  subject: string;
-  gradeLevel: string;
   duration: number;
   status: GenerationStatus;
   createdAt: string;
+  aspectRatio: string;
+  model: string | null;
+  videoUrl: string | null;
+};
+
+type CreateVideoResponse = {
+  success: true;
+  generation: {
+    id: string;
+    status: GenerationStatus;
+    provider: string;
+    model: string | null;
+    providerTaskId: string | null;
+    prompt: string;
+    duration: number;
+    aspectRatio: string;
+    creditsUsed: number;
+    createdAt: string;
+  };
+};
+
+type ApiErrorResponse = {
+  success: false;
+  error: string;
+  code?: string;
+  required?: number;
+  available?: number;
+};
+
+type VideoStatusResponse = {
+  success: true;
+  generation: {
+    id: string;
+    status: GenerationStatus;
+    provider: string;
+    model: string | null;
+    duration: number;
+    aspectRatio: string;
+    creditsUsed: number;
+    videoUrl: string | null;
+    thumbnailUrl: string | null;
+    errorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+  };
 };
 
 /* ============================================================
    OPTIONS
 ============================================================ */
 
-const styles = [
-  {
-    value: "Educational Animation",
-    description: "Friendly animated educational content",
-  },
-  {
-    value: "Explainer",
-    description: "Clean visual explanations",
-  },
-  {
-    value: "Classroom",
-    description: "Teacher-style classroom presentation",
-  },
-  {
-    value: "Cinematic",
-    description: "More cinematic and engaging visuals",
-  },
-];
-
 const durations = [
   {
-    value: 5,
-    label: "5 seconds",
-    credits: 10,
+    value: 4,
+    label: "4 seconds",
+    creditsSora2: 10,
+    creditsSora2Pro: 20,
   },
   {
-    value: 10,
-    label: "10 seconds",
-    credits: 20,
+    value: 8,
+    label: "8 seconds",
+    creditsSora2: 20,
+    creditsSora2Pro: 40,
   },
   {
-    value: 15,
-    label: "15 seconds",
-    credits: 30,
+    value: 12,
+    label: "12 seconds",
+    creditsSora2: 30,
+    creditsSora2Pro: 60,
   },
-];
+] as const;
 
 const aspectRatios = [
   {
     value: "16:9",
     label: "Landscape",
-    description: "YouTube / classroom",
+    description: "YouTube, websites, presentations",
   },
   {
     value: "9:16",
     label: "Portrait",
-    description: "Shorts / Reels / TikTok",
+    description: "Shorts, Reels, TikTok",
+  },
+] as const;
+
+const models = [
+  {
+    value: "sora-2",
+    label: "Sora 2",
+    description: "Fast, high-quality video generation",
   },
   {
-    value: "1:1",
-    label: "Square",
-    description: "Social media",
+    value: "sora-2-pro",
+    label: "Sora 2 Pro",
+    description: "Higher-quality generation",
   },
-];
+] as const;
+
+const styles = [
+  {
+    value: "Cinematic",
+    description: "Dramatic, polished cinematic visuals",
+  },
+  {
+    value: "Realistic",
+    description: "Natural, lifelike visual style",
+  },
+  {
+    value: "Animated",
+    description: "Stylized animated visuals",
+  },
+  {
+    value: "Documentary",
+    description: "Natural documentary-style presentation",
+  },
+  {
+    value: "Commercial",
+    description: "Polished advertising and promotional style",
+  },
+  {
+    value: "Minimal",
+    description: "Clean and visually simple presentation",
+  },
+] as const;
 
 /* ============================================================
    COMPONENT
 ============================================================ */
 
-export default function AIVideoStudio() {
+export default function AIVideoStudio({
+  projectId = null,
+}: {
+  projectId?: string | null;
+}) {
   const [prompt, setPrompt] = useState("");
 
-  const [style, setStyle] = useState("Educational Animation");
+  const [model, setModel] = useState<VideoModel>("sora-2");
 
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState<VideoDuration>(8);
 
-  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("16:9");
 
-  const [subjectId, setSubjectId] = useState("");
-
-  const [gradeLevel, setGradeLevel] = useState("");
-
-  const [topicId, setTopicId] = useState("");
-
-  const [subjects, setSubjects] = useState<
-    {
-      id: string;
-      name: string;
-    }[]
-  >([]);
-
-  const [topics, setTopics] = useState<
-    {
-      id: string;
-      name: string;
-      gradeLevel: string;
-    }[]
-  >([]);
-
-  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-
-  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
+  const [style, setStyle] = useState<string>("Cinematic");
 
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
 
@@ -157,99 +194,23 @@ export default function AIVideoStudio() {
 
   const [showSettings, setShowSettings] = useState(false);
 
-  const [videos, setVideos] = useState<VideoItem[]>([
-    {
-      id: "demo-1",
-      title: "Introduction to Photosynthesis",
-      subject: "Science",
-      gradeLevel: "Grade 6",
-      duration: 10,
-      status: "COMPLETED",
-      createdAt: "Today",
-    },
-    {
-      id: "demo-2",
-      title: "Understanding Fractions",
-      subject: "Mathematics",
-      gradeLevel: "Grade 5",
-      duration: 10,
-      status: "COMPLETED",
-      createdAt: "Yesterday",
-    },
-  ]);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
 
   /* ============================================================
      DERIVED VALUES
   ============================================================ */
-
-  const selectedSubject = subjects.find((subject) => subject.id === subjectId);
-
-  const selectedTopic = topics.find((topic) => topic.id === topicId);
-
-  const topic = selectedTopic?.name ?? "";
-
-  const subject = selectedSubject?.name ?? "";
 
   const selectedDuration = useMemo(
     () => durations.find((item) => item.value === duration) ?? durations[1],
     [duration],
   );
 
-  /*
-   * Credit cost comes from the shared pricing
-   * configuration.
-   */
-  const creditCost = getAIVideoCreditCost(duration);
+  const creditCost =
+    model === "sora-2-pro"
+      ? selectedDuration.creditsSora2Pro
+      : selectedDuration.creditsSora2;
 
   const canAffordVideo = creditBalance !== null && creditBalance >= creditCost;
-
-  /* ============================================================
-     LOAD SUBJECTS
-  ============================================================ */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSubjects() {
-      setIsLoadingSubjects(true);
-
-      try {
-        const result = await GetAIVideoSubjects();
-
-        if (cancelled) {
-          return;
-        }
-
-        if (result.success) {
-          setSubjects(result.subjects);
-
-          /*
-           * Select the first subject only if
-           * nothing has been selected yet.
-           */
-          if (result.subjects.length > 0) {
-            setSubjectId((current) => current || result.subjects[0].id);
-          }
-        } else {
-          console.error(result.error);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to load subjects:", error);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSubjects(false);
-        }
-      }
-    }
-
-    loadSubjects();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   /* ============================================================
      LOAD CREDIT BALANCE
@@ -262,22 +223,30 @@ export default function AIVideoStudio() {
       setIsLoadingCredits(true);
 
       try {
-        const result = await GetMyAIVideoCreditBalance();
+        const response = await fetch("/api/credits", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load credit balance.");
+        }
+
+        const data = await response.json();
 
         if (cancelled) {
           return;
         }
 
-        if (result.success) {
-          setCreditBalance(result.balance);
+        if (typeof data.balance === "number") {
+          setCreditBalance(data.balance);
         } else {
-          console.error(result.error);
-
           setCreditBalance(0);
         }
       } catch (error) {
         if (!cancelled) {
-          console.error("Failed to load AI video credits:", error);
+          console.error("Failed to load AI credits:", error);
 
           setCreditBalance(0);
         }
@@ -288,7 +257,7 @@ export default function AIVideoStudio() {
       }
     }
 
-    loadCredits();
+    void loadCredits();
 
     return () => {
       cancelled = true;
@@ -296,89 +265,129 @@ export default function AIVideoStudio() {
   }, []);
 
   /* ============================================================
-     LOAD TOPICS
+     POLL VIDEO GENERATION
   ============================================================ */
 
-  useEffect(() => {
-    /*
-     * Do not synchronously call setState here when
-     * subject/grade is empty.
-     *
-     * The handlers below clear the topics when the
-     * user changes subject or grade.
-     */
+  async function pollVideoGeneration(generationId: string) {
+    const maxAttempts = 120;
+    const interval = 5000;
 
-    if (!subjectId || !gradeLevel) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadTopics() {
-      setIsLoadingTopics(true);
-
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const result = await GetAIVideoTopics(subjectId, gradeLevel);
+        const response = await fetch(`/api/ai/video/${generationId}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
 
-        if (cancelled) {
-          return;
+        const data = (await response.json()) as
+          | VideoStatusResponse
+          | ApiErrorResponse;
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.success === false
+              ? data.error
+              : "Unable to retrieve video status.",
+          );
         }
 
-        if (result.success) {
-          setTopics(result.topics);
-        } else {
-          console.error(result.error);
+        const generation = data.generation;
 
-          setTopics([]);
+        setVideos((current) =>
+          current.map((video) =>
+            video.id === generation.id
+              ? {
+                  ...video,
+                  status: generation.status,
+                  duration: generation.duration,
+                  aspectRatio: generation.aspectRatio,
+                  model: generation.model,
+                  videoUrl: generation.videoUrl,
+                }
+              : video,
+          ),
+        );
+
+        if (generation.status === "COMPLETED") {
+          if (projectId) {
+            try {
+              await fetch(
+                `/api/ai/video/${encodeURIComponent(generation.id)}/artifact`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({ projectId }),
+                },
+              );
+              window.dispatchEvent(new CustomEvent("justdy:artifact-created"));
+            } catch (artifactError) {
+              console.error("Failed to persist video artifact:", artifactError);
+            }
+          }
+
+          await refreshCreditBalance();
+          return generation;
+        }
+
+        if (
+          generation.status === "FAILED" ||
+          generation.status === "CANCELLED"
+        ) {
+          /*
+           * The server handles the refund.
+           */
+          alert(generation.errorMessage || "Video generation failed.");
+
+          /*
+           * Refresh the balance after a terminal
+           * generation because a refund may have
+           * occurred.
+           */
+          await refreshCreditBalance();
+
+          return generation;
         }
       } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to load topics:", error);
-
-          setTopics([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingTopics(false);
-        }
+        /*
+         * A temporary network failure should not
+         * immediately kill a long-running Sora
+         * generation.
+         */
+        console.error("Video polling error:", error);
       }
+
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
 
-    loadTopics();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [subjectId, gradeLevel]);
-
-  /* ============================================================
-     SUBJECT CHANGE
-  ============================================================ */
-
-  function handleSubjectChange(value: string) {
-    setSubjectId(value);
-
-    /*
-     * Changing the subject invalidates the
-     * currently selected topic.
-     */
-    setTopics([]);
-    setTopicId("");
+    console.error(`Video generation polling timed out: ${generationId}`);
   }
 
   /* ============================================================
-     GRADE LEVEL CHANGE
+     REFRESH CREDITS
   ============================================================ */
 
-  function handleGradeLevelChange(value: string) {
-    setGradeLevel(value);
+  async function refreshCreditBalance() {
+    try {
+      const response = await fetch("/api/credits", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
 
-    /*
-     * Changing grade invalidates the current
-     * topic list and selection.
-     */
-    setTopics([]);
-    setTopicId("");
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+
+      if (typeof data.balance === "number") {
+        setCreditBalance(data.balance);
+      }
+    } catch (error) {
+      console.error("Failed to refresh credits:", error);
+    }
   }
 
   /* ============================================================
@@ -386,34 +395,20 @@ export default function AIVideoStudio() {
   ============================================================ */
 
   async function handleGenerate() {
-    if (!prompt.trim()) {
-      alert("Please describe what you want the video to teach.");
+    const trimmedPrompt = prompt.trim();
 
+    if (!trimmedPrompt) {
+      alert("Please describe the video you want to create.");
       return;
     }
 
-    if (!subjectId) {
-      alert("Please select a subject.");
-
+    if (trimmedPrompt.length > 4000) {
+      alert("Your video prompt cannot exceed 4000 characters.");
       return;
     }
 
-    if (!gradeLevel) {
-      alert("Please select a grade level.");
-
-      return;
-    }
-
-    /*
-     * Client-side credit check for UX.
-     *
-     * The server performs the real check again,
-     * so this cannot be bypassed by manipulating
-     * the browser.
-     */
     if (creditBalance === null) {
       alert("Your credit balance is still loading. Please try again.");
-
       return;
     }
 
@@ -421,95 +416,84 @@ export default function AIVideoStudio() {
       alert(
         `You need ${creditCost} credits to generate this video. You currently have ${creditBalance}.`,
       );
-
       return;
     }
 
     setIsGenerating(true);
 
     try {
-      const result = await CreateVideoGeneration({
-        prompt: prompt.trim(),
-
-        subjectId,
-
-        topicId: topicId || undefined,
-
-        /*
-         * Convert the string value from
-         * the select into the Prisma enum type.
-         *
-         * No `any` required.
-         */
-        gradeLevel: gradeLevel as GradeLevel,
-
-        title: topic || undefined,
-
-        style,
-
-        duration,
-
-        aspectRatio,
+      const response = await fetch("/api/ai/video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          prompt: trimmedPrompt,
+          duration,
+          aspectRatio,
+          model,
+          style: style || undefined,
+          projectId: projectId || undefined,
+          requestId: crypto.randomUUID(),
+        }),
       });
 
-      if (!result.success) {
-        alert(result.error);
+      const data = (await response.json()) as
+        | CreateVideoResponse
+        | ApiErrorResponse;
 
-        return;
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.success === false
+            ? data.error
+            : "Unable to start video generation.",
+        );
       }
 
-      const generation = result.generation;
+      const generation = data.generation;
 
       /*
-       * Immediately reflect the server-side
-       * credit deduction in the UI.
+       * The server has already charged the exact
+       * amount of credits.
        */
       setCreditBalance((current) =>
-        current === null ? null : Math.max(0, current - creditCost),
+        current === null ? null : Math.max(0, current - generation.creditsUsed),
       );
 
-      /*
-       * Add the new generation to the
-       * recent generations list.
-       */
+      const title =
+        trimmedPrompt.length > 60
+          ? `${trimmedPrompt.slice(0, 60)}...`
+          : trimmedPrompt;
+
       setVideos((current) => [
         {
           id: generation.id,
-
-          title:
-            topic ||
-            prompt.trim().slice(0, 55) +
-              (prompt.trim().length > 55 ? "..." : ""),
-
-          subject,
-
-          gradeLevel,
-
-          duration,
-
-          status: "PENDING",
-
+          title,
+          duration: generation.duration,
+          aspectRatio: generation.aspectRatio,
+          model: generation.model,
+          status: generation.status,
           createdAt: "Just now",
+          videoUrl: null,
         },
-
         ...current,
       ]);
 
-      /*
-       * Reset the prompt after successful
-       * creation.
-       */
       setPrompt("");
 
       /*
-       * Clear topic selection.
+       * Begin monitoring the asynchronous
+       * Sora generation.
        */
-      setTopicId("");
+      void pollVideoGeneration(generation.id);
     } catch (error) {
       console.error("Generate video error:", error);
 
       alert(
-        "Something went wrong while creating the video generation request.",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while creating the video.",
       );
     } finally {
       setIsGenerating(false);
@@ -544,13 +528,19 @@ export default function AIVideoStudio() {
             </h1>
 
             <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-              Create engaging educational videos from a simple idea.
+              Turn your ideas into AI-generated video with a simple text prompt.
             </p>
           </div>
 
-          {/* ====================================================
-              CREDIT BALANCE
-          ==================================================== */}
+          {projectId && (
+            <ProjectContextIndicator
+              projectId={projectId}
+              compact
+              className="mt-4"
+            />
+          )}
+
+          {/* CREDIT BALANCE */}
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -583,7 +573,7 @@ export default function AIVideoStudio() {
                   </h2>
 
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Describe what you want your students to learn.
+                    Describe the video you want Justdy AI to create.
                   </p>
                 </div>
 
@@ -600,137 +590,59 @@ export default function AIVideoStudio() {
               ================================================== */}
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800 dark:text-slate-200">
-                  What should this video teach?
-                </label>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                    Describe your video
+                  </label>
+
+                  <span className="text-[11px] text-slate-400">
+                    {prompt.length}/4000
+                  </span>
+                </div>
 
                 <div className="relative">
                   <textarea
                     value={prompt}
                     onChange={(event) => setPrompt(event.target.value)}
-                    placeholder="Example: Explain photosynthesis to a Grade 6 student using a fun animated plant and simple examples..."
-                    rows={6}
-                    maxLength={1000}
+                    placeholder="Example: A cinematic aerial shot of a futuristic city at night, neon lights reflecting on rain-soaked streets, dramatic lighting, realistic film quality..."
+                    rows={7}
+                    maxLength={4000}
                     className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:bg-slate-950"
                   />
+                </div>
 
-                  <div className="absolute bottom-3 right-3 text-[11px] text-slate-400">
-                    {prompt.length}/1000
-                  </div>
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  Describe the subject, setting, movement, camera angle,
+                  lighting, mood, and visual details you want.
+                </p>
+              </div>
+
+              {/* ==================================================
+                  EXAMPLES
+              ================================================== */}
+
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Prompt ideas
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {[
+                    "A cinematic sunset over a tropical beach with gentle waves and palm trees moving in the wind.",
+                    "A futuristic sports car driving through a neon-lit city at night in the rain.",
+                    "A playful animated dog trying to cook breakfast in a small colorful kitchen.",
+                  ].map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setPrompt(example)}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-xs leading-5 text-slate-600 transition hover:border-primary/30 hover:bg-primary/[0.03] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
+                    >
+                      {example}
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              {/* ==================================================
-                  QUICK CONTEXT
-              ================================================== */}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Subject">
-                  <Select
-                    value={subjectId}
-                    onChange={handleSubjectChange}
-                    disabled={isLoadingSubjects}
-                    options={subjects.map((item) => ({
-                      value: item.id,
-                      label: item.name,
-                    }))}
-                    placeholder={
-                      isLoadingSubjects
-                        ? "Loading subjects..."
-                        : "Select subject"
-                    }
-                  />
-                </Field>
-
-                <Field label="Grade level">
-                  <Select
-                    value={gradeLevel}
-                    onChange={handleGradeLevelChange}
-                    options={[
-                      {
-                        value: "Grade1",
-                        label: "Grade 1",
-                      },
-                      {
-                        value: "Grade2",
-                        label: "Grade 2",
-                      },
-                      {
-                        value: "Grade3",
-                        label: "Grade 3",
-                      },
-                      {
-                        value: "Grade4",
-                        label: "Grade 4",
-                      },
-                      {
-                        value: "Grade5",
-                        label: "Grade 5",
-                      },
-                      {
-                        value: "Grade6",
-                        label: "Grade 6",
-                      },
-                      {
-                        value: "Grade7",
-                        label: "Grade 7",
-                      },
-                      {
-                        value: "Grade8",
-                        label: "Grade 8",
-                      },
-                      {
-                        value: "Grade9",
-                        label: "Grade 9",
-                      },
-                      {
-                        value: "Grade10",
-                        label: "Grade 10",
-                      },
-                      {
-                        value: "Grade11",
-                        label: "Grade 11",
-                      },
-                      {
-                        value: "Grade12",
-                        label: "Grade 12",
-                      },
-                    ]}
-                    placeholder="Select grade level"
-                  />
-                </Field>
-              </div>
-
-              {/* ==================================================
-                  TOPIC
-              ================================================== */}
-
-              <Field
-                label="Topic"
-                optional
-                hint={
-                  !subjectId || !gradeLevel
-                    ? "Select a subject and grade first."
-                    : undefined
-                }
-              >
-                <Select
-                  value={topicId}
-                  onChange={setTopicId}
-                  disabled={!subjectId || !gradeLevel || isLoadingTopics}
-                  options={topics.map((item) => ({
-                    value: item.id,
-                    label: item.name,
-                  }))}
-                  placeholder={
-                    isLoadingTopics
-                      ? "Loading topics..."
-                      : topics.length === 0
-                        ? "No topics available"
-                        : "Select topic"
-                  }
-                />
-              </Field>
 
               {/* ==================================================
                   ADVANCED SETTINGS
@@ -752,7 +664,7 @@ export default function AIVideoStudio() {
                     </p>
 
                     <p className="text-xs text-slate-400">
-                      Style, duration and format
+                      Model, duration, format and style
                     </p>
                   </div>
                 </div>
@@ -765,8 +677,69 @@ export default function AIVideoStudio() {
               </button>
 
               {showSettings && (
-                <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/60 sm:grid-cols-3">
-                  <Field label="Style">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                  {/* MODEL */}
+
+                  <Field label="Video model">
+                    <Select
+                      value={model}
+                      onChange={(value) => setModel(value as VideoModel)}
+                      options={models.map((item) => ({
+                        value: item.value,
+                        label: item.label,
+                      }))}
+                    />
+
+                    <p className="mt-1.5 text-[11px] text-slate-400">
+                      {models.find((item) => item.value === model)?.description}
+                    </p>
+                  </Field>
+
+                  {/* DURATION + FORMAT */}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Duration">
+                      <Select
+                        value={String(duration)}
+                        onChange={(value) =>
+                          setDuration(Number(value) as VideoDuration)
+                        }
+                        options={durations.map((item) => ({
+                          value: String(item.value),
+                          label: `${item.label} · ${
+                            model === "sora-2-pro"
+                              ? item.creditsSora2Pro
+                              : item.creditsSora2
+                          } credits`,
+                        }))}
+                      />
+                    </Field>
+
+                    <Field label="Format">
+                      <Select
+                        value={aspectRatio}
+                        onChange={(value) =>
+                          setAspectRatio(value as VideoAspectRatio)
+                        }
+                        options={aspectRatios.map((item) => ({
+                          value: item.value,
+                          label: `${item.value} · ${item.label}`,
+                        }))}
+                      />
+
+                      <p className="mt-1.5 text-[11px] text-slate-400">
+                        {
+                          aspectRatios.find(
+                            (item) => item.value === aspectRatio,
+                          )?.description
+                        }
+                      </p>
+                    </Field>
+                  </div>
+
+                  {/* STYLE */}
+
+                  <Field label="Visual style">
                     <Select
                       value={style}
                       onChange={setStyle}
@@ -775,28 +748,10 @@ export default function AIVideoStudio() {
                         label: item.value,
                       }))}
                     />
-                  </Field>
 
-                  <Field label="Duration">
-                    <Select
-                      value={String(duration)}
-                      onChange={(value) => setDuration(Number(value))}
-                      options={durations.map((item) => ({
-                        value: String(item.value),
-                        label: `${item.label} · ${item.credits} credits`,
-                      }))}
-                    />
-                  </Field>
-
-                  <Field label="Format">
-                    <Select
-                      value={aspectRatio}
-                      onChange={setAspectRatio}
-                      options={aspectRatios.map((item) => ({
-                        value: item.value,
-                        label: `${item.value} · ${item.label}`,
-                      }))}
-                    />
+                    <p className="mt-1.5 text-[11px] text-slate-400">
+                      {styles.find((item) => item.value === style)?.description}
+                    </p>
                   </Field>
                 </div>
               )}
@@ -855,9 +810,9 @@ export default function AIVideoStudio() {
             </div>
           </section>
 
-          {/* ======================================================
-              PREVIEW / SETTINGS
-          ====================================================== */}
+          {/* ====================================================
+              PREVIEW
+          ==================================================== */}
 
           <aside className="space-y-5">
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -874,11 +829,7 @@ export default function AIVideoStudio() {
               <div className="p-5">
                 <div
                   className={`relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-slate-950 ${
-                    aspectRatio === "9:16"
-                      ? "aspect-[9/14]"
-                      : aspectRatio === "1:1"
-                        ? "aspect-square"
-                        : "aspect-video"
+                    aspectRatio === "9:16" ? "aspect-[9/14]" : "aspect-video"
                   }`}
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.25),transparent_45%)]" />
@@ -893,7 +844,8 @@ export default function AIVideoStudio() {
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-white/45">
-                      Your generated video will appear here.
+                      Your generated video will appear in your recent
+                      generations below.
                     </p>
                   </div>
                 </div>
@@ -936,8 +888,10 @@ export default function AIVideoStudio() {
                   </h3>
 
                   <p className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                    Include the learning objective, student age or grade,
-                    examples you want shown, and the visual style you prefer.
+                    Describe the subject, environment, action, camera movement,
+                    lighting, mood, and visual style you want. The more useful
+                    visual detail you provide, the more control you give the
+                    model.
                   </p>
                 </div>
               </div>
@@ -964,13 +918,6 @@ export default function AIVideoStudio() {
                 Your latest AI-created videos.
               </p>
             </div>
-
-            <button
-              type="button"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              View all
-            </button>
           </div>
 
           {videos.length === 0 ? (
@@ -984,7 +931,8 @@ export default function AIVideoStudio() {
               </h3>
 
               <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">
-                Your generated videos will appear here.
+                Describe your first video above and Justdy AI will create it for
+                you.
               </p>
             </div>
           ) : (
@@ -1006,33 +954,17 @@ export default function AIVideoStudio() {
 
 function Field({
   label,
-  optional,
-  hint,
   children,
 }: {
   label: string;
-  optional?: boolean;
-  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="mb-2">
         <label className="text-sm font-medium text-slate-800 dark:text-slate-200">
           {label}
-
-          {optional && (
-            <span className="ml-1.5 text-xs font-normal text-slate-400">
-              Optional
-            </span>
-          )}
         </label>
-
-        {hint && (
-          <span className="hidden text-[11px] text-slate-400 sm:block">
-            {hint}
-          </span>
-        )}
       </div>
 
       {children}
@@ -1124,31 +1056,49 @@ function VideoCard({ video }: { video: VideoItem }) {
 
   const isFailed = video.status === "FAILED";
 
+  const isCompleted = video.status === "COMPLETED";
+
   return (
     <div className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-950">
-      <div className="relative aspect-video overflow-hidden bg-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.24),transparent_50%)]" />
-
-        {isProcessing || isPending ? (
-          <div className="relative flex h-full flex-col items-center justify-center text-center">
-            <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/70" />
-
-            <span className="text-xs font-medium text-white/80">
-              {isPending ? "Queued..." : "Generating..."}
-            </span>
-          </div>
-        ) : isFailed ? (
-          <div className="relative flex h-full flex-col items-center justify-center">
-            <X className="mb-2 h-6 w-6 text-white/60" />
-
-            <span className="text-xs text-white/60">Generation failed</span>
-          </div>
+      <div
+        className={`relative overflow-hidden bg-slate-950 ${
+          video.aspectRatio === "9:16" ? "aspect-[9/14]" : "aspect-video"
+        }`}
+      >
+        {isCompleted && video.videoUrl ? (
+          <video
+            src={video.videoUrl}
+            controls
+            preload="metadata"
+            playsInline
+            className="h-full w-full object-cover"
+          />
         ) : (
-          <div className="relative flex h-full items-center justify-center">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition group-hover:scale-105">
-              <Play className="ml-0.5 h-4 w-4 fill-current" />
-            </div>
-          </div>
+          <>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.24),transparent_50%)]" />
+
+            {isProcessing || isPending ? (
+              <div className="relative flex h-full flex-col items-center justify-center text-center">
+                <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/70" />
+
+                <span className="text-xs font-medium text-white/80">
+                  {isPending ? "Queued..." : "Generating..."}
+                </span>
+              </div>
+            ) : isFailed ? (
+              <div className="relative flex h-full flex-col items-center justify-center">
+                <X className="mb-2 h-6 w-6 text-white/60" />
+
+                <span className="text-xs text-white/60">Generation failed</span>
+              </div>
+            ) : (
+              <div className="relative flex h-full items-center justify-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition group-hover:scale-105">
+                  <Play className="ml-0.5 h-4 w-4 fill-current" />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium text-white backdrop-blur">
@@ -1164,7 +1114,7 @@ function VideoCard({ video }: { video: VideoItem }) {
             </h3>
 
             <p className="mt-1 text-xs text-slate-400">
-              {video.subject} · {video.gradeLevel}
+              {video.model ?? "Sora"} · {video.aspectRatio}
             </p>
           </div>
 

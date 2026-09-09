@@ -190,9 +190,8 @@ export const auth = betterAuth({
 
   user: {
     fields: {
-      image: "imageUrl",
+      image: "image",
     },
-
     additionalFields: {
       role: {
         type: "string",
@@ -223,62 +222,24 @@ export const auth = betterAuth({
               where: {
                 id: user.id,
               },
-
               select: {
                 id: true,
-                name: true,
                 email: true,
-                role: true,
-                verificationStatus: true,
                 emailVerified: true,
               },
             });
 
             if (!dbUser) {
               console.error("DATABASE HOOK: User not found:", user.id);
-
               return;
             }
 
-            // ==================================================
-            // EDUCATOR EMAIL VERIFIED
-            // ==================================================
-
-            if (dbUser.role === "Educator" && dbUser.emailVerified === true) {
-              const { render } = await import("@react-email/render");
-
-              const AwaitingApprovalEmail = (
-                await import("@/app/_components/AwaitingApprovalEmail")
-              ).default;
-
-              const emailHtml = await render(
-                AwaitingApprovalEmail({
-                  username: dbUser.name ?? "Educator",
-                }),
-              );
-
-              const result = await resend.emails.send({
-                from: "Justdy <onboarding@justdy.com>",
-
-                to: [dbUser.email.trim().toLowerCase()],
-
-                subject: "Email Verified - Awaiting Admin Approval",
-
-                html: emailHtml,
-              });
-
-              if (result.error) {
-                console.error("EDUCATOR APPROVAL EMAIL ERROR:", result.error);
-
-                return;
-              }
-
-              console.log("EDUCATOR APPROVAL EMAIL SENT:", {
-                userId: dbUser.id,
-                email: dbUser.email,
-                emailId: result.data?.id,
-              });
-            }
+            // User-update hook intentionally contains no learner,
+            // educator, or administrator workflow.
+            //
+            // Authentication is now role-agnostic. AI, projects,
+            // library, and creation features authorize against the
+            // authenticated user directly.
           } catch (error) {
             console.error("DATABASE USER UPDATE HOOK FAILED:", error);
           }
@@ -418,8 +379,7 @@ export const auth = betterAuth({
 
               amountPaid: purchaseData?.amountPaid ?? "0.00",
 
-              dashboardUrl:
-                purchaseData?.dashboardUrl ?? `${appUrl}/learner/products`,
+              dashboardUrl: purchaseData?.dashboardUrl ?? `${appUrl}/library`,
 
               isNewAccount: true,
             }),

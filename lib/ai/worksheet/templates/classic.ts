@@ -14,29 +14,6 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function renderOptions(
-  options: {
-    id: string;
-    text: string;
-  }[],
-) {
-  return options
-    .map(
-      (option, index) => `
-        <div class="option">
-          <span class="option-circle">
-            ${String.fromCharCode(65 + index)}
-          </span>
-
-          <span class="option-text">
-            ${escapeHtml(option.text)}
-          </span>
-        </div>
-      `,
-    )
-    .join("");
-}
-
 function renderQuestion(question: WorksheetDocument["questions"][number]) {
   const questionText = escapeHtml(question.question);
   let body = "";
@@ -48,7 +25,7 @@ function renderQuestion(question: WorksheetDocument["questions"][number]) {
           .map(
             (option, index) => `
           <div class="worksheet-option">
-            <span class="worksheet-option-label">${String.fromCharCode(65 + index)}.</span>
+            <span class="worksheet-option-circle">${String.fromCharCode(65 + index)}</span>
             <span class="worksheet-option-text">${escapeHtml(option.text)}</span>
           </div>
         `,
@@ -67,13 +44,7 @@ function renderQuestion(question: WorksheetDocument["questions"][number]) {
     `;
   }
 
-  if (question.type === "short_answer") {
-    body = `
-      <div class="worksheet-short-answer-space" aria-hidden="true"></div>
-    `;
-  }
-
-  if (question.type === "fill_in_blank") {
+  if (question.type === "short_answer" || question.type === "fill_in_blank") {
     body = `
       <div class="worksheet-answer-lines">
         <div></div><div></div>
@@ -152,7 +123,7 @@ function designCss(design: WorksheetDesign): string {
       .worksheet-question{background:#f8fafc;border:1px solid ${border};border-radius:12px;padding:11px 13px;margin-bottom:11px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
       .worksheet-question-number{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:7px;background:${accent};color:#fff!important;font-size:9px}
       .worksheet-options{margin-left:30px;margin-bottom:2px}
-      
+      .worksheet-option-circle{border-radius:7px;background:#fff}
     `,
     playful: `
       .worksheet-print-frame{border:2px dashed ${border};border-radius:20px}
@@ -165,7 +136,8 @@ function designCss(design: WorksheetDesign): string {
       .worksheet-question{background:#fff;border:1px solid ${border};border-radius:14px;padding:10px 12px;margin-bottom:10px;box-shadow:2px 2px 0 ${border}88}
       .worksheet-question-number{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;border-radius:50%;background:${accent};color:#fff!important;font-size:9px}
       .worksheet-options{margin-left:30px}
-        .worksheet-document::after{content:"✦  •  ✦  •  ✦";display:block;text-align:center;color:${accent};font-size:10px;letter-spacing:5px;margin-top:12px}
+      .worksheet-option-circle{border-width:2px;background:#fff}
+      .worksheet-document::after{content:"✦  •  ✦  •  ✦";display:block;text-align:center;color:${accent};font-size:10px;letter-spacing:5px;margin-top:12px}
     `,
     assessment: `
       .worksheet-print-frame{border:1px solid #222;border-radius:2px}
@@ -177,7 +149,8 @@ function designCss(design: WorksheetDesign): string {
       .worksheet-question{border-bottom:1px solid #999;padding-bottom:9px;margin-bottom:10px;background:#fff}
       .worksheet-question-number{font-weight:900;color:#111!important}
       .worksheet-question-text{font-size:10.5px}
-        .worksheet-print-footer{border-top-color:#999}
+      .worksheet-option-circle{border:1px solid #222}
+      .worksheet-print-footer{border-top-color:#999}
     `,
   }[design.template];
 
@@ -219,13 +192,11 @@ function designCss(design: WorksheetDesign): string {
     .worksheet-directions{border-color:var(--design-border);border-left-color:var(--design-accent)}
     .worksheet-question{margin-bottom:var(--density-question);padding-bottom:var(--density-padding)}
     .worksheet-question-text{color:#171717}
-    .worksheet-option-label{color:var(--design-accent)}
-    .worksheet-tf-circle{border-color:var(--design-accent)}
+    .worksheet-option-circle,.worksheet-tf-circle{border-color:var(--design-accent)}
+    .worksheet-option-circle{color:var(--design-accent)}
     .worksheet-answer-lines div{height:var(--answer-space);border-bottom-color:var(--design-border)}
-    .worksheet-short-answer-space{height:var(--answer-space);}
-    
     .worksheet-response-lines div,.worksheet-matching-lines div{height:var(--response-space);border-bottom-color:var(--design-border)}
-    .worksheet-question,.worksheet-options,.worksheet-true-false,.worksheet-answer-lines,.worksheet-short-answer-space,.worksheet-response-lines,.worksheet-matching-lines{break-inside:avoid;page-break-inside:avoid}
+    .worksheet-question,.worksheet-options,.worksheet-true-false,.worksheet-answer-lines,.worksheet-response-lines,.worksheet-matching-lines{break-inside:avoid;page-break-inside:avoid}
     @media print{.worksheet-document main{grid-template-columns:${design.questionLayout === "two-column" ? "repeat(2,minmax(0,1fr))" : "1fr"}}}
   `;
 }
@@ -398,12 +369,41 @@ body {
 ========================================================= */
 
 /*
- * The top-right grade label is intentionally removed.
- * Grade information remains available in the footer only.
+ * IMPORTANT:
+ *
+ * There is intentionally NO company name here.
+ *
+ * Only the grade appears in the top-right corner.
  */
-.worksheet-print-header,
+
+.worksheet-print-header {
+  position: fixed;
+
+  top: 0.38in;
+
+  left: 0.62in;
+
+  right: 0.62in;
+
+  height: 0.22in;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: flex-end;
+
+  z-index: 101;
+}
+
 .worksheet-print-grade {
-  display: none;
+  font-size: 9.5px;
+
+  font-weight: 800;
+
+  letter-spacing: 0.4px;
+
+  text-transform: uppercase;
 }
 
 
@@ -580,15 +580,11 @@ body {
 ========================================================= */
 
 .worksheet-student-info {
-  display: grid;
+  display: flex;
 
-  grid-template-columns: 2fr 1fr 1fr;
+  align-items: center;
 
-  align-items: end;
-
-  column-gap: 24px;
-
-  width: 100%;
+  gap: 24px;
 
   margin:
     0
@@ -604,28 +600,22 @@ body {
   white-space: nowrap;
 }
 
-.student-field {
+.worksheet-student-field {
   display: flex;
 
   align-items: flex-end;
 
   gap: 5px;
-
-  min-width: 0;
 }
 
-.student-field strong {
-  flex-shrink: 0;
+.worksheet-name-field {
+  flex: 1;
 }
 
-.student-field .field-line {
-  display: block;
+.worksheet-field-line {
+  display: inline-block;
 
-  flex: 1 1 auto;
-
-  min-width: 0;
-
-  width: auto;
+  width: 2.15in;
 
   height: 15px;
 
@@ -633,15 +623,8 @@ body {
     1px solid #333;
 }
 
-/* The locked classic layout intentionally uses the full row:
-   Name gets the most writing room, while Date and Score remain
-   comfortably sized and evenly spaced. */
-.student-field.name-field {
-  min-width: 0;
-}
-
-.student-field .field-line.small {
-  width: auto;
+.worksheet-field-line.small {
+  width: 0.85in;
 }
 
 
@@ -741,7 +724,7 @@ body {
   display: grid;
 
   grid-template-columns:
-    repeat(2, minmax(0, 1fr));
+    repeat(4, 1fr);
 
   gap: 7px;
 
@@ -751,9 +734,9 @@ body {
 .worksheet-option {
   display: flex;
 
-  align-items: flex-start;
+  align-items: center;
 
-  gap: 4px;
+  gap: 6px;
 
   min-width: 0;
 
@@ -762,10 +745,26 @@ body {
   line-height: 1.3;
 }
 
-.worksheet-option-label {
+.worksheet-option-circle {
+  width: 19px;
+
+  height: 19px;
+
+  border:
+    1px solid #444;
+
+  border-radius: 50%;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
   flex-shrink: 0;
-  font-size: 9.7px;
-  line-height: 1.3;
+
+  font-size: 8px;
+
   font-weight: 800;
 }
 
@@ -815,11 +814,6 @@ body {
 /* =========================================================
    ANSWER LINES
 ========================================================= */
-
-.worksheet-short-answer-space {
-  height: 20px;
-  margin: 7px 0 0 21px;
-}
 
 .worksheet-answer-lines {
   margin:
@@ -910,6 +904,21 @@ ${designCss(design)}
 ======================================================== -->
 
 <div class="worksheet-print-frame"></div>
+
+
+<!-- =======================================================
+     TOP RIGHT GRADE
+
+     NO COMPANY NAME HERE
+======================================================== -->
+
+<header class="worksheet-print-header">
+
+  <div class="worksheet-print-grade">
+    ${escapeHtml(worksheet.gradeLevel)}
+  </div>
+
+</header>
 
 
 <!-- =======================================================

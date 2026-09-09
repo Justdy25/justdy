@@ -115,7 +115,7 @@ export function SiteHeader({
 
         <div className="flex min-w-0 items-center">
           <span className="truncate text-sm font-semibold text-slate-800">
-            Dashboard
+            Justdy AI
           </span>
         </div>
       </div>

@@ -15,20 +15,33 @@ const EMPTY_WHITEBOARD_DATA = {
   currentPageIndex: 0,
 };
 
+async function getAuthenticatedUser() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  return session?.user ?? null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const user = await getAuthenticatedUser();
 
-    const userId = session?.user?.id;
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user?.id) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+        },
+        {
+          status: 401,
+        },
+      );
     }
 
     const body = (await request.json()) as ResolveRequest;
+
     const mode = body.mode;
+
     const appointmentId =
       typeof body.appointmentId === "string" ? body.appointmentId.trim() : "";
 
@@ -38,18 +51,24 @@ export async function POST(request: NextRequest) {
           error:
             'Invalid whiteboard mode. Expected "standalone" or "appointment".',
         },
-        { status: 400 },
+        {
+          status: 400,
+        },
       );
     }
 
-    // ============================================================
-    // STANDALONE WHITEBOARD
-    // ============================================================
+    /*
+     * ============================================================
+     * STANDALONE WHITEBOARD
+     * ============================================================
+     *
+     * Standalone boards remain private to their owner.
+     */
 
     if (mode === "standalone") {
       let whiteboard = await prisma.whiteboard.findFirst({
         where: {
-          userId,
+          userId: user.id,
           isStandalone: true,
           appointmentId: null,
         },
@@ -61,7 +80,7 @@ export async function POST(request: NextRequest) {
       if (!whiteboard) {
         whiteboard = await prisma.whiteboard.create({
           data: {
-            userId,
+            userId: user.id,
             isStandalone: true,
             appointmentId: null,
             name: "Standalone Whiteboard",
@@ -70,17 +89,25 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return NextResponse.json({ whiteboard });
+      return NextResponse.json({
+        whiteboard,
+      });
     }
 
-    // ============================================================
-    // APPOINTMENT WHITEBOARD
-    // ============================================================
+    /*
+     * ============================================================
+     * APPOINTMENT WHITEBOARD
+     * ============================================================
+     */
 
     if (!appointmentId) {
       return NextResponse.json(
-        { error: "Appointment ID is required" },
-        { status: 400 },
+        {
+          error: "Appointment ID is required.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
@@ -90,59 +117,69 @@ export async function POST(request: NextRequest) {
       },
       select: {
         id: true,
+        learnerId: true,
         educatorId: true,
+        status: true,
       },
     });
 
     if (!appointment) {
-      console.error("WHITEBOARD RESOLVE: Appointment not found", {
-        appointmentId,
-        userId,
-      });
-
       return NextResponse.json(
         {
-          error: "Appointment not found",
-          appointmentId,
+          error: "Appointment not found.",
         },
-        { status: 404 },
+        {
+          status: 404,
+        },
       );
     }
 
-    if (appointment.educatorId !== userId) {
+    /*
+     * Both tutoring participants may access
+     * the shared appointment whiteboard.
+     *
+     * learnerId / educatorId are the legacy DB
+     * field names. New application terminology
+     * remains customer / tutor.
+     */
+
+    const isParticipant =
+      appointment.learnerId === user.id || appointment.educatorId === user.id;
+
+    if (!isParticipant) {
       return NextResponse.json(
         {
-          error: "You are not authorized to access this appointment whiteboard",
+          error: "You are not authorized to access this session whiteboard.",
         },
-        { status: 403 },
+        {
+          status: 403,
+        },
       );
     }
 
-    const existingWhiteboard = await prisma.whiteboard.findUnique({
+    let whiteboard = await prisma.whiteboard.findUnique({
       where: {
         appointmentId: appointment.id,
       },
     });
 
-    if (existingWhiteboard) {
-      if (existingWhiteboard.userId !== userId) {
-        return NextResponse.json(
-          {
-            error: "You are not authorized to access this whiteboard",
-          },
-          { status: 403 },
-        );
-      }
-
+    if (whiteboard) {
       return NextResponse.json({
-        whiteboard: existingWhiteboard,
+        whiteboard,
       });
     }
 
+    /*
+     * Create the shared board if the Stripe webhook
+     * did not already create it.
+     *
+     * The first authorized participant may create it.
+     */
+
     try {
-      const whiteboard = await prisma.whiteboard.create({
+      whiteboard = await prisma.whiteboard.create({
         data: {
-          userId,
+          userId: user.id,
           appointmentId: appointment.id,
           isStandalone: false,
           name: "Session Whiteboard",
@@ -150,33 +187,38 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({ whiteboard }, { status: 201 });
+      return NextResponse.json(
+        {
+          whiteboard,
+        },
+        {
+          status: 201,
+        },
+      );
     } catch (error: unknown) {
-      // appointmentId is unique. If another request created the board
-      // between our read and create, return that board instead of failing.
+      /*
+       * appointmentId is unique.
+       *
+       * If another participant created the board
+       * concurrently, return the existing board.
+       */
+
       if (
         typeof error === "object" &&
         error !== null &&
         "code" in error &&
         error.code === "P2002"
       ) {
-        const whiteboard = await prisma.whiteboard.findUnique({
+        const existing = await prisma.whiteboard.findUnique({
           where: {
             appointmentId: appointment.id,
           },
         });
 
-        if (whiteboard) {
-          if (whiteboard.userId !== userId) {
-            return NextResponse.json(
-              {
-                error: "You are not authorized to access this whiteboard",
-              },
-              { status: 403 },
-            );
-          }
-
-          return NextResponse.json({ whiteboard });
+        if (existing) {
+          return NextResponse.json({
+            whiteboard: existing,
+          });
         }
       }
 
@@ -186,8 +228,12 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/whiteboards/resolve error:", error);
 
     return NextResponse.json(
-      { error: "Failed to resolve whiteboard" },
-      { status: 500 },
+      {
+        error: "Failed to resolve whiteboard.",
+      },
+      {
+        status: 500,
+      },
     );
   }
 }

@@ -1,10 +1,7 @@
 "use client";
 
-import { Check, Download, FileText, Printer, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { Check, Download, Printer, ShieldCheck, Truck } from "lucide-react";
 import { useState } from "react";
-import type { ReactNode } from "react";
-import { EnrollmentButton } from "./EnrollmentButton";
 
 interface ProductPurchaseOptionsProps {
   productId: string;
@@ -12,12 +9,18 @@ interface ProductPurchaseOptionsProps {
   digitalPrice: number;
   printedPrice?: number | null;
   image?: string;
-  isCourse?: boolean;
-  isEnrolled?: boolean;
-  enrolledHref?: string;
 }
 
 type PurchaseType = "digital" | "printed";
+
+interface CartItem {
+  id: string;
+  title: string;
+  price: number;
+  image?: string;
+  quantity: number;
+  purchaseType: PurchaseType;
+}
 
 export function ProductPurchaseOptions({
   productId,
@@ -25,412 +28,179 @@ export function ProductPurchaseOptions({
   digitalPrice,
   printedPrice,
   image,
-  isCourse = false,
-  isEnrolled = false,
-  enrolledHref,
 }: ProductPurchaseOptionsProps) {
   const hasPrintedOption =
-    !isCourse &&
     typeof printedPrice === "number" &&
     Number.isFinite(printedPrice) &&
     printedPrice > 0;
 
   const [selectedOption, setSelectedOption] = useState<PurchaseType>("digital");
+  const [added, setAdded] = useState(false);
 
-  /*
-   * If there is no printed option, force digital.
-   */
-
-  const selectedOptionSafe: PurchaseType = hasPrintedOption
-    ? selectedOption
-    : "digital";
+  const selectedOptionSafe = hasPrintedOption ? selectedOption : "digital";
 
   const isPrinted = selectedOptionSafe === "printed";
+  const selectedPrice = isPrinted ? printedPrice! : digitalPrice;
 
-  /*
-   * ============================================================
-   * PRICE
-   * ============================================================
-   */
+  function addToCart() {
+    const existingRaw = localStorage.getItem("cart");
+    let existing: CartItem[] = [];
 
-  const selectedPrice =
-    isPrinted && hasPrintedOption ? printedPrice! : digitalPrice;
+    try {
+      const parsed = existingRaw ? JSON.parse(existingRaw) : [];
+      if (Array.isArray(parsed)) {
+        existing = parsed;
+      }
+    } catch {
+      existing = [];
+    }
 
-  /*
-   * ============================================================
-   * CART PRODUCT
-   * ============================================================
-   */
-
-  const cartProduct = {
-    id: productId,
-
-    title: isCourse
-      ? title
-      : isPrinted
+    const cartItem: CartItem = {
+      id: productId,
+      title: isPrinted
         ? `${title} — Printed Hard Copy`
         : `${title} — Digital Download`,
+      price: selectedPrice,
+      image,
+      quantity: 1,
+      purchaseType: selectedOptionSafe,
+    };
 
-    price: selectedPrice,
+    const existingIndex = existing.findIndex(
+      (item) =>
+        item.id === productId && item.purchaseType === selectedOptionSafe,
+    );
 
-    image,
+    if (existingIndex >= 0) {
+      existing[existingIndex] = {
+        ...existing[existingIndex],
+        quantity: (existing[existingIndex].quantity || 1) + 1,
+      };
+    } else {
+      existing.push(cartItem);
+    }
 
-    purchaseType: isCourse
-      ? ("course" as const)
-      : isPrinted
-        ? ("printed" as const)
-        : ("digital" as const),
-  };
+    localStorage.setItem("cart", JSON.stringify(existing));
+    window.dispatchEvent(new Event("cartUpdated"));
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 2200);
+  }
 
   return (
     <aside className="lg:sticky lg:top-6">
-      <div
-        className="
-          overflow-hidden
-          rounded-md
-          border
-          bg-white
-          shadow-xl
-          shadow-slate-200/40
-          border-emerald-900/30
-         
-          dark:shadow-none
-        "
-      >
-        {/* ======================================================
-            HEADER
-        ====================================================== */}
+      <div className="overflow-hidden rounded-3xl border bg-card shadow-xl shadow-black/5">
+        <div className="border-b bg-muted/30 p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#857938]">
+            Get this resource
+          </p>
 
-        <div
-          className="
-            border-b
-            border-emerald-900/30
-            bg-linear-to-br
-            from-white
-            via-white
-            to-slate-50
-            px-6
-            py-6
-           
-            dark:bg-emerald-900/30
-          "
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider ">
-                {isCourse ? "Course enrollment" : "Get this resource"}
-              </p>
-            </div>
+          <h2 className="mt-2 text-xl font-bold">
+            {hasPrintedOption ? "Choose your format" : "Digital access"}
+          </h2>
 
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white">
-              {isPrinted ? (
-                <Printer className="size-5" />
-              ) : isCourse ? (
-                <FileText className="size-5" />
-              ) : (
-                <Download className="size-5" />
-              )}
-            </div>
-          </div>
-
-          {/* PRICE */}
-
-          <div className="mt-0 pt-0">
-            <p className="text-4xl font-bold tracking-tight text-blue-600">
+          <div className="mt-5 flex items-end gap-2">
+            <span className="text-4xl font-bold tracking-tight text-[#857938]">
               {formatPrice(selectedPrice)}
-            </p>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              {isCourse
-                ? "One-time payment • Lifetime course access"
-                : isPrinted
-                  ? "Printed hard copy • Shipped to your address"
-                  : "Digital download • Instant access after purchase"}
-            </p>
+            </span>
           </div>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isPrinted ? "Printed hard copy" : "Digital download"}
+          </p>
         </div>
 
-        {/* ======================================================
-            PURCHASE OPTIONS
-        ====================================================== */}
-
-        <div className="p-6">
-          {isCourse ? (
-            <div
-              className="
-                rounded-xl
-                border-2
-                bg-[#857938]/5
-                p-4
-              "
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="
-                    flex
-                    size-5
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-md
-                    bg-blue-500
-                  "
-                >
-                  <Check className="size-3 text-white" />
-                </div>
-
-                <div
-                  className="
-                    flex
-                    size-10
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-lg
-                    bg-emerald-500/10
-                    text-emerald-600
-                  "
-                >
-                  <FileText className="size-5" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Course Enrollment</p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Full course access after purchase
-                  </p>
-                </div>
-
-                <p className="shrink-0 text-base font-bold">
-                  {formatPrice(digitalPrice)}
-                </p>
-              </div>
-            </div>
-          ) : hasPrintedOption ? (
-            /*
-             * ====================================================
-             * DIGITAL + PRINTED
-             * ====================================================
-             */
-
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xs text-muted-foreground">
-                  Select how you would like to receive this product.
-                </h3>
-              </div>
-
-              {/* DIGITAL */}
-
-              <button
-                type="button"
-                aria-pressed={selectedOptionSafe === "digital"}
+        <div className="space-y-5 p-6">
+          {hasPrintedOption ? (
+            <div className="space-y-3">
+              <PurchaseOption
+                selected={selectedOptionSafe === "digital"}
+                icon={<Download className="size-5" />}
+                title="Digital Download"
+                description="Instant access after purchase"
+                price={digitalPrice}
                 onClick={() => setSelectedOption("digital")}
-                className={`
-                  group
-                  flex
-                  w-full
-                  cursor-pointer
-                  items-center
-                  gap-3
-                  rounded-md
-                  border-2
-                  p-4
-                  text-left
-                  transition-all
-                  duration-200
-                  ${
-                    selectedOptionSafe === "digital"
-                      ? "border-blue-500 bg-[#857938]/5 shadow-sm"
-                      : "border-slate-200 bg-background hover:border-[#857938]/50 dark:border-slate-700"
-                  }
-                `}
-              >
-                <PurchaseRadio selected={selectedOptionSafe === "digital"} />
+              />
 
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
-                  <Download className="size-5" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Digital Download</p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Download immediately
-                  </p>
-                </div>
-
-                <p className="shrink-0 text-base font-bold text-blue-600">
-                  {formatPrice(digitalPrice)}
-                </p>
-              </button>
-
-              {/* PRINTED */}
-
-              <button
-                type="button"
-                aria-pressed={selectedOptionSafe === "printed"}
+              <PurchaseOption
+                selected={selectedOptionSafe === "printed"}
+                icon={<Printer className="size-5" />}
+                title="Printed Hard Copy"
+                description="Physical copy shipped to you"
+                price={printedPrice!}
                 onClick={() => setSelectedOption("printed")}
-                className={`
-                  group
-                  flex
-                  w-full
-                  cursor-pointer
-                  items-center
-                  gap-3
-                  rounded-md
-                  border-2
-                  p-4
-                  text-left
-                  transition-all
-                  duration-200
-                  ${
-                    selectedOptionSafe === "printed"
-                      ? "border-blue-500 bg-[#857938]/5 shadow-sm"
-                      : "border-slate-200 bg-background hover:border-[#857938]/50 dark:border-slate-700"
-                  }
-                `}
-              >
-                <PurchaseRadio selected={selectedOptionSafe === "printed"} />
-
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600">
-                  <Printer className="size-5" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Printed Hard Copy</p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Physical copy shipped to you
-                  </p>
-                </div>
-
-                <p className="shrink-0 text-base font-bold text-blue-500">
-                  {formatPrice(printedPrice!)}
-                </p>
-              </button>
+              />
             </div>
           ) : (
-            /*
-             * ====================================================
-             * DIGITAL ONLY
-             * ====================================================
-             */
-
-            <div
-              className="
-                rounded-md
-                border-2
-              
-                bg-[#857938]/5
-                p-4
-              "
-            >
+            <div className="rounded-2xl border-2 border-[#857938] bg-[#857938]/5 p-4">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
                   <Download className="size-5" />
                 </div>
-
-                <div className="min-w-0 flex-1">
+                <div>
                   <p className="text-sm font-semibold">Digital Download</p>
-
                   <p className="mt-1 text-xs text-muted-foreground">
                     Instant access after purchase
                   </p>
                 </div>
-
-                <p className="shrink-0 text-base font-bold text-blue-600">
-                  {formatPrice(digitalPrice)}
-                </p>
               </div>
             </div>
           )}
 
-          {/* ======================================================
-              BENEFITS
-          ====================================================== */}
+          <div className="rounded-2xl border bg-muted/40 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Your selection
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {isPrinted ? "Printed Hard Copy" : "Digital Download"}
+                </p>
+              </div>
+              <p className="text-xl font-bold text-[#857938]">
+                {formatPrice(selectedPrice)}
+              </p>
+            </div>
 
-          <div className="mt-5 space-y-3">
-            <PurchaseBenefit
+            {isPrinted ? (
+              <div className="mt-3 flex items-start gap-2 border-t pt-3">
+                <Truck className="mt-0.5 size-4 shrink-0 text-[#857938]" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Shipping details are collected during checkout.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-3">
+            <Benefit
               icon={<Check className="size-4" />}
               title="Secure purchase"
               description="Protected payment and checkout"
             />
-
-            <PurchaseBenefit
+            <Benefit
               icon={<Check className="size-4" />}
-              title={
-                isCourse
-                  ? "Lifetime course access"
-                  : isPrinted
-                    ? "Physical delivery"
-                    : "Instant access"
-              }
+              title={isPrinted ? "Physical delivery" : "Instant access"}
               description={
-                isCourse
-                  ? "Access your course whenever you need it"
-                  : isPrinted
-                    ? "Shipped to your address"
-                    : "Access your files immediately"
+                isPrinted
+                  ? "Shipped to your checkout address"
+                  : "Access your digital files after purchase"
               }
             />
-
-            <PurchaseBenefit
-              icon={<Check className="size-4" />}
-              title="30-day guarantee"
-              description="Purchase with confidence"
-            />
-
-            {isCourse && (
-              <PurchaseBenefit
-                icon={<Check className="size-4" />}
-                title="Certificate"
-                description="Receive a certificate upon completion"
-              />
-            )}
           </div>
 
-          <div className="my-6 border-t border-slate-200 dark:border-white/80" />
+          <button
+            type="button"
+            onClick={addToCart}
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-[#857938] px-4 text-sm font-semibold text-white transition hover:bg-[#70662e]"
+          >
+            {added
+              ? "Added to Cart"
+              : isPrinted
+                ? "Add Printed Copy to Cart"
+                : "Add Digital Download to Cart"}
+          </button>
 
-          {/* ======================================================
-              CART BUTTON
-          ====================================================== */}
-
-          {isEnrolled && enrolledHref ? (
-            <Link
-              href={enrolledHref}
-              className="
-                flex
-                h-12
-                w-full
-                items-center
-                justify-center
-                rounded-xl
-                bg-blue-500
-                px-4
-                text-sm
-                font-semibold
-                text-white
-                transition-colors
-                hover:bg-blue-600
-              "
-            >
-              {isCourse ? "Watch Course" : "Access Your Product"}
-            </Link>
-          ) : (
-            <EnrollmentButton
-              courseId={productId}
-              buttonText="Add to Cart"
-              product={cartProduct}
-            />
-          )}
-
-          {/* ======================================================
-              SECURITY
-          ====================================================== */}
-
-          <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
             <ShieldCheck className="size-3.5 text-emerald-600" />
             <span>Secure checkout</span>
             <span>•</span>
@@ -442,44 +212,64 @@ export function ProductPurchaseOptions({
   );
 }
 
-/* ==========================================================================
-   RADIO INDICATOR
-============================================================================= */
-
-function PurchaseRadio({ selected }: { selected: boolean }) {
+function PurchaseOption({
+  selected,
+  icon,
+  title,
+  description,
+  price,
+  onClick,
+}: {
+  selected: boolean;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  price: number;
+  onClick: () => void;
+}) {
   return (
-    <div
-      className={`
-        flex
-        size-5
-        shrink-0
-        items-center
-        justify-center
-        rounded-full
-        border-2
-        transition-all
-        ${
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
+        selected
+          ? "border-[#857938] bg-[#857938]/5"
+          : "border-border bg-background hover:border-[#857938]/50"
+      }`}
+    >
+      <div
+        className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
           selected
             ? "border-[#857938] bg-[#857938]"
-            : "border-slate-300 dark:border-slate-600"
-        }
-      `}
-    >
-      {selected && <Check className="size-3 text-white" />}
-    </div>
+            : "border-muted-foreground/30"
+        }`}
+      >
+        {selected ? <Check className="size-3 text-white" /> : null}
+      </div>
+
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+
+      <p className="shrink-0 text-sm font-bold text-[#857938]">
+        {formatPrice(price)}
+      </p>
+    </button>
   );
 }
 
-/* ==========================================================================
-   BENEFIT
-============================================================================= */
-
-function PurchaseBenefit({
+function Benefit({
   icon,
   title,
   description,
 }: {
-  icon: ReactNode;
+  icon: React.ReactNode;
   title: string;
   description: string;
 }) {
@@ -488,19 +278,13 @@ function PurchaseBenefit({
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
         {icon}
       </div>
-
-      <div className="min-w-0">
+      <div>
         <p className="text-sm font-medium">{title}</p>
-
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
     </div>
   );
 }
-
-/* ==========================================================================
-   PRICE FORMATTER
-============================================================================= */
 
 function formatPrice(priceInCents: number) {
   return new Intl.NumberFormat("en-US", {

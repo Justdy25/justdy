@@ -8,11 +8,14 @@ import { CreateWorksheet } from "@/app/actions/ai/create-worksheet";
 import { SaveWorksheet } from "@/app/actions/ai/save-worksheet";
 
 import WorksheetEditor from "./WorksheetEditor";
-import WorksheetPdfPreview from "./WorksheetPdfPreview";
+import WorksheetDesignPanel from "./WorksheetDesignPanel";
+import {
+  DEFAULT_WORKSHEET_DESIGN,
+  type WorksheetDesign,
+} from "@/lib/ai/worksheet/worksheet-design";
 
 import {
   ArrowLeft,
-  Check,
   ChevronDown,
   Download,
   FileKey2,
@@ -24,14 +27,13 @@ import {
   WandSparkles,
   ZoomIn,
   ZoomOut,
+  Palette as PaletteIcon,
 } from "lucide-react";
+
+import { renderClassicWorksheet } from "@/lib/ai/worksheet/templates/classic";
 
 import type { WorksheetQuestionType } from "@/lib/ai/worksheet/types";
 import type { WorksheetDocument } from "@/lib/ai/worksheet/schema";
-import {
-  DEFAULT_WORKSHEET_DESIGN,
-  type WorksheetDesign,
-} from "@/lib/ai/worksheet/worksheet-design";
 
 interface WorksheetStudioProps {
   subjects: {
@@ -42,8 +44,6 @@ interface WorksheetStudioProps {
 
 const LETTER_WIDTH_PX = 816;
 const LETTER_HEIGHT_PX = 1056;
-
-const design: WorksheetDesign = DEFAULT_WORKSHEET_DESIGN;
 
 const QUESTION_TYPE_OPTIONS: {
   value: WorksheetQuestionType;
@@ -195,11 +195,14 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
 
   const [editing, setEditing] = useState(false);
 
+  const [design, setDesign] = useState<WorksheetDesign>(
+    DEFAULT_WORKSHEET_DESIGN,
+  );
+  const [designOpen, setDesignOpen] = useState(false);
+
   const [isDirty, setIsDirty] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
-
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -223,6 +226,8 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
 
   const [previewScale, setPreviewScale] = useState(1);
   const [manualZoom, setManualZoom] = useState<number | null>(null);
+
+  const effectivePreviewScale = manualZoom ?? previewScale;
 
   /*
    * ============================================================
@@ -408,8 +413,6 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
 
         setIsDirty(false);
 
-        setSavedAt(new Date(result.savedAt));
-
         setSaveError(null);
 
         setError(null);
@@ -488,8 +491,6 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
       setGenerationId(result.generationId);
 
       setIsDirty(false);
-
-      setSavedAt(new Date(result.savedAt));
     } catch (err) {
       console.error("Save worksheet error:", err);
 
@@ -579,8 +580,6 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
       setGenerationId(null);
 
       setIsDirty(true);
-
-      setSavedAt(null);
 
       setSaveError(null);
 
@@ -674,10 +673,99 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
 
   /*
    * ============================================================
-   * LIVE PDF PREVIEW
+   * PREVIEW HTML
    * ============================================================
-   * The preview uses the exact server-side PDF renderer.
    */
+
+  const previewHtml = useMemo(() => {
+    if (!worksheet) {
+      return "";
+    }
+
+    return renderClassicWorksheet(worksheet, {
+      template: design.template,
+      design,
+
+      showAnswerKey: false,
+
+      showBranding: true,
+
+      showNameField: true,
+
+      showDateField: true,
+
+      showScoreField: true,
+
+      showPageNumbers: true,
+    });
+  }, [worksheet, design]);
+
+  /*
+   * ============================================================
+   * PREVIEW SCALE
+   * ============================================================
+   */
+
+  useEffect(() => {
+    if (!worksheet) {
+      return;
+    }
+
+    const container = previewContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    function updateScale() {
+      const element = previewContainerRef.current;
+
+      if (!element) {
+        return;
+      }
+
+      const width = element.clientWidth;
+
+      const height = element.clientHeight;
+
+      if (!width || !height) {
+        return;
+      }
+
+      const horizontalPadding = 32;
+
+      const verticalPadding = 32;
+
+      const availableWidth = Math.max(0, width - horizontalPadding);
+
+      const availableHeight = Math.max(0, height - verticalPadding);
+
+      const widthScale = availableWidth / LETTER_WIDTH_PX;
+
+      const heightScale = availableHeight / LETTER_HEIGHT_PX;
+
+      const scale = Math.min(widthScale, heightScale, 1);
+
+      setPreviewScale(Math.max(scale, 0.1));
+    }
+
+    updateScale();
+
+    const observer = new ResizeObserver(() => {
+      updateScale();
+    });
+
+    observer.observe(container);
+
+    window.addEventListener("resize", updateScale);
+
+    return () => {
+      observer.disconnect();
+
+      window.removeEventListener("resize", updateScale);
+    };
+  }, [worksheet]);
+
   /*
    * ============================================================
    * BEFORE UNLOAD
@@ -1119,6 +1207,15 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
 
                     <button
                       type="button"
+                      onClick={() => setDesignOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs font-semibold shadow-sm transition hover:bg-muted"
+                    >
+                      <PaletteIcon className="h-3.5 w-3.5" />
+                      Design
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setEditing(true)}
                       className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs font-semibold shadow-sm transition hover:bg-muted"
                     >
@@ -1166,68 +1263,82 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
                 {/* CANVAS */}
                 <div
                   ref={previewContainerRef}
-                  className="relative min-h-0 flex-1 overflow-hidden bg-[#e9ebef] dark:bg-slate-950/80"
+                  className="relative min-h-0 flex-1 overflow-auto bg-muted/60 p-5 dark:bg-background/80 sm:p-8"
                 >
-                  <WorksheetPdfPreview
-                    worksheet={worksheet}
-                    design={design}
-                    containerRef={previewContainerRef}
-                    manualZoom={manualZoom}
-                    onFitZoom={setPreviewScale}
-                    onZoomChange={setManualZoom}
-                  />
+                  <div className="flex min-h-full w-full items-start justify-center">
+                    <div
+                      style={{
+                        width: LETTER_WIDTH_PX * effectivePreviewScale,
+                        height: LETTER_HEIGHT_PX * effectivePreviewScale,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <iframe
+                        key={JSON.stringify(worksheet)}
+                        srcDoc={previewHtml}
+                        title="Worksheet Preview"
+                        scrolling="no"
+                        style={{
+                          width: `${LETTER_WIDTH_PX}px`,
+                          height: `${LETTER_HEIGHT_PX}px`,
+                          border: "none",
+                          display: "block",
+                          transform: `scale(${effectivePreviewScale})`,
+                          transformOrigin: "top left",
+                          background: "var(--background, #ffffff)",
+                          boxShadow: "0 18px 45px rgba(15, 23, 42, 0.10)",
+                        }}
+                      />
+                    </div>
+                  </div>
 
                   {/* FLOATING ZOOM */}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
-                    <div className="pointer-events-auto flex items-center gap-1 rounded-xl border bg-background/95 p-1 shadow-lg backdrop-blur">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setManualZoom((current) =>
-                            Math.max(0.5, (current ?? previewScale) - 0.1),
-                          )
-                        }
-                        className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-muted"
-                        aria-label="Zoom out"
-                        title="Zoom out"
-                      >
-                        <ZoomOut className="h-4 w-4" />
-                      </button>
+                  <div className="sticky bottom-3 mx-auto mt-4 flex w-fit items-center gap-1 rounded-xl border bg-background/95 p-1 shadow-lg backdrop-blur">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setManualZoom((current) =>
+                          Math.max(0.5, (current ?? previewScale) - 0.1),
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-muted"
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setManualZoom(0.75)}
-                        className="min-w-14 rounded-lg px-2 py-1.5 text-xs font-bold tabular-nums transition hover:bg-muted"
-                        aria-label="Set zoom to 75%"
-                        title="Set zoom to 75%"
-                      >
-                        {Math.round((manualZoom ?? previewScale) * 100)}%
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualZoom(0.75)}
+                      className="min-w-14 rounded-lg px-2 py-1.5 text-xs font-bold tabular-nums transition hover:bg-muted"
+                    >
+                      {Math.round(effectivePreviewScale * 100)}%
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setManualZoom((current) =>
-                            Math.min(1, (current ?? previewScale) + 0.1),
-                          )
-                        }
-                        className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-muted"
-                        aria-label="Zoom in"
-                        title="Zoom in"
-                      >
-                        <ZoomIn className="h-4 w-4" />
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setManualZoom((current) =>
+                          Math.min(1, (current ?? previewScale) + 0.1),
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-muted"
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </button>
 
-                      <div className="mx-1 h-5 w-px bg-border" />
+                    <div className="mx-1 h-5 w-px bg-border" />
 
-                      <button
-                        type="button"
-                        onClick={() => setManualZoom(null)}
-                        className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                      >
-                        Fit
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setManualZoom(null)}
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      Fit
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1261,6 +1372,39 @@ export default function WorksheetStudio({ subjects }: WorksheetStudioProps) {
           </section>
         </div>
       </div>
+
+      {designOpen && (
+        <div className="fixed inset-0 z-[80]">
+          <button
+            type="button"
+            aria-label="Close design panel"
+            onClick={() => setDesignOpen(false)}
+            className="absolute inset-0 bg-foreground/35 backdrop-blur-[2px]"
+          />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l bg-background shadow-2xl">
+            <WorksheetDesignPanel
+              value={design}
+              onChange={(next) => {
+                setDesign(next);
+                setIsDirty(true);
+              }}
+              onReset={() => {
+                setDesign(DEFAULT_WORKSHEET_DESIGN);
+                setIsDirty(true);
+              }}
+            />
+            <div className="border-t p-4">
+              <button
+                type="button"
+                onClick={() => setDesignOpen(false)}
+                className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-95"
+              >
+                Done
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* ======================================================
           EDITOR

@@ -1,42 +1,74 @@
 "use client";
 
-import { Search, X, Loader2, ArrowRight, Package } from "lucide-react";
+import { ArrowRight, Loader2, Package, Search, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import {
-  ProductSearchResult,
-  searchProducts,
-} from "../actions/manage-search-products";
-import Image from "next/image";
+
+interface ProductSearchResult {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  imageKey?: string | null;
+  price?: number | null;
+}
+
+function formatImageUrl(key?: string | null) {
+  if (!key) return null;
+
+  if (key.startsWith("http://") || key.startsWith("https://")) {
+    return key;
+  }
+
+  return `https://utfs.io/f/${key.replace(/^\/+/, "")}`;
+}
 
 export function ProductSearchInput() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
   const [query, setQuery] = useState(() => searchParams.get("search") || "");
   const [suggestions, setSuggestions] = useState<ProductSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
+
     const controller = new AbortController();
-    const loadSuggestions = async () => {
+
+    async function loadSuggestions() {
       setIsLoadingSuggestions(true);
 
       try {
-        const results = await searchProducts(query);
+        const response = await fetch(
+          `/api/products/explore?search=${encodeURIComponent(query.trim())}`,
+          {
+            method: "GET",
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load product suggestions.");
+        }
+
+        const data = (await response.json()) as ProductSearchResult[];
+
         if (!controller.signal.aborted) {
-          setSuggestions(results);
+          setSuggestions(data.slice(0, 6));
         }
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error("Failed to load search suggestions:", error);
-
           setSuggestions([]);
         }
       } finally {
@@ -44,7 +76,7 @@ export function ProductSearchInput() {
           setIsLoadingSuggestions(false);
         }
       }
-    };
+    }
 
     const timeout = setTimeout(loadSuggestions, query.trim() ? 250 : 0);
 
@@ -55,14 +87,14 @@ export function ProductSearchInput() {
   }, [query, isOpen]);
 
   useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
+    function handleOutsideClick(event: MouseEvent) {
       if (
         wrapperRef.current &&
         !wrapperRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
-    };
+    }
 
     document.addEventListener("mousedown", handleOutsideClick);
 
@@ -73,30 +105,37 @@ export function ProductSearchInput() {
 
   function handleSearch(term: string) {
     const trimmedTerm = term.trim();
+    const params = new URLSearchParams(searchParams.toString());
 
-    if (!trimmedTerm) {
-      setIsOpen(false);
-      return;
+    if (trimmedTerm) {
+      params.set("search", trimmedTerm);
+    } else {
+      params.delete("search");
     }
 
     setIsOpen(false);
 
     startTransition(() => {
-      router.push(`/products?search=${encodeURIComponent(trimmedTerm)}`);
+      router.replace(
+        `${pathname}${params.toString() ? `?${params.toString()}` : ""}`,
+      );
     });
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     handleSearch(query);
   }
 
   function clearSearch() {
     setQuery("");
     setSuggestions([]);
+
     const params = new URLSearchParams(searchParams.toString());
     params.delete("search");
+
     setIsOpen(false);
+
     startTransition(() => {
       router.replace(
         `${pathname}${params.toString() ? `?${params.toString()}` : ""}`,
@@ -108,170 +147,103 @@ export function ProductSearchInput() {
 
   return (
     <div ref={wrapperRef} className="relative mx-auto w-full max-w-xl">
-      <form onSubmit={handleSubmit}>
-        <div className="relative flex items-center">
-          <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-800" />
+      <form onSubmit={handleSubmit} className="relative">
+        <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setIsOpen(true);
-            }}
-            onFocus={() => setIsOpen(true)}
-            placeholder="Search courses, workbooks, templates..."
-            autoComplete="off"
-            className="h-10 w-full rounded-md border border-blue-100 bg-background pl-11 pr-24 text-sm text-slate-900 shadow-lg transition-all
-              placeholder:text-slate-500 focus:border-[#857938] focus:outline-none focus:ring-2  focus:ring-[#857938]/30 dark:border-slate-400
-              "
-          />
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder="Search resources"
+          aria-label="Search resources"
+          className="h-11 w-full rounded-full border bg-background pl-11 pr-20 text-sm outline-none transition focus:border-[#857938] focus:ring-2 focus:ring-[#857938]/20"
+        />
 
-          {/* Clear */}
-          {query && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="absolute right-14 top-1/2 -translate-y-1/2 cursor-pointer p-1.5 text-slate-800 transition-colors hover:text-slate-700 dark:hover:text-red-600"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Search Button */}
+        {query ? (
           <button
-            type="submit"
-            aria-label="Search"
-            className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md bg-blue-500
-              text-white transition-all hover:scale-105 hover:bg-blue-600 hover:text-white active:scale-95"
+            type="button"
+            onClick={clearSearch}
+            aria-label="Clear search"
+            className="absolute right-12 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            {isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Search className="size-4" />
-            )}
+            <X className="size-4" />
           </button>
-        </div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={isPending}
+          aria-label="Search"
+          className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-[#857938] text-white transition hover:bg-[#70662e] disabled:opacity-60"
+        >
+          {isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
+        </button>
       </form>
 
-      {/* ================================================================ */}
-      {/* Suggestions Dropdown                                              */}
-      {/* ================================================================ */}
-
-      {isOpen && (
-        <div
-          className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-md border border-slate-200 bg-white shadow-2xl
-            dark:border-slate-400 dark:bg-background"
-        >
-          {/* Loading */}
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border bg-popover shadow-2xl">
           {isLoadingSuggestions ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
-              <Loader2 className="size-4 animate-spin text-[#857938]" />
-              Searching...
+            <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Searching…
             </div>
           ) : suggestions.length > 0 ? (
-            <div>
-              {/* Header */}
-              <div className="border-b px-4 py-3 border-slate-300">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  {query.trim() ? "Search Suggestions" : "Popular Products"}
-                </p>
-              </div>
+            <div className="p-2">
+              {suggestions.map((product) => {
+                const imageUrl = formatImageUrl(product.imageKey);
 
-              {/* Products */}
-              <div className="p-2">
-                {suggestions.map((product) => (
+                return (
                   <Link
                     key={product.id}
                     href={`/products/${product.slug}`}
                     onClick={() => setIsOpen(false)}
-                    className="group flex items-center gap-3 rounded-md p-2.5 transition-colors hover:bg-emerald-900/20"
+                    className="flex items-center gap-3 rounded-xl p-3 transition hover:bg-muted"
                   >
-                    {/* Image */}
-                    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-slate-100 ">
-                      {product.imageUrl ? (
+                    <div className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                      {imageUrl ? (
                         <Image
-                          src={product.imageUrl}
-                          alt={product.title}
-                          width={48}
-                          height={48}
+                          src={imageUrl}
+                          alt=""
+                          fill
                           sizes="48px"
-                          className="size-full object-cover"
+                          className="object-cover"
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center">
-                          <Package className="size-5 text-slate-400" />
-                        </div>
+                        <Package className="size-5 text-muted-foreground" />
                       )}
                     </div>
 
-                    {/* Information */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-[#857938]">
+                      <p className="truncate text-sm font-medium">
                         {product.title}
                       </p>
 
-                      <div className="mt-0.5 flex items-center gap-2">
-                        {product.category && (
-                          <span className="truncate text-xs text-slate-400">
-                            {product.category}
-                          </span>
-                        )}
-
-                        <span className="text-xs font-semibold text-[#857938]">
-                          ${(product.price / 100).toFixed(2)}
-                        </span>
-                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {product.type}
+                      </p>
                     </div>
 
-                    {/* Arrow */}
-                    <ArrowRight className="size-4 shrink-0 text-slate-800 transition-all group-hover:translate-x-0.5 group-hover:text-[#857938]" />
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
                   </Link>
-                ))}
-              </div>
-
-              {/* View all results */}
-              {query.trim() && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const trimmedQuery = query.trim();
-                    if (!trimmedQuery) return;
-                    setIsOpen(false);
-                    router.push(
-                      `/products?search=${encodeURIComponent(trimmedQuery)}`,
-                    );
-                  }}
-                  className="flex w-full cursor-pointer items-center justify-between border-t border-slate-300 px-4 py-3 text-sm font-semibold
-                   text-[#857938] transition-colors hover:bg-emerald-900/30"
-                >
-                  <span>
-                    View all results for &quot;
-                    {query}
-                    &quot;
-                  </span>
-
-                  <ArrowRight className="size-4" />
-                </button>
-              )}
+                );
+              })}
             </div>
           ) : (
-            <div className="px-5 py-8 text-center">
-              <Package className="mx-auto mb-2 size-8 text-slate-300" />
-
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                No products found
-              </p>
-
-              <p className="mt-1 text-xs text-slate-400">
-                Try another search term.
-              </p>
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No matching resources.
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

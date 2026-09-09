@@ -205,7 +205,7 @@ export default function WorksheetsLibrary({
       return;
     }
 
-    const url = `/manage/ai/worksheet?projectId=${encodeURIComponent(
+    const url = `/create/worksheet?projectId=${encodeURIComponent(
       projectId,
     )}`;
 
@@ -329,7 +329,7 @@ export default function WorksheetsLibrary({
           </div>
 
           <Link
-            href="/manage/ai/worksheet?new=1"
+            href="/create/worksheet?new=1"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
@@ -362,7 +362,7 @@ export default function WorksheetsLibrary({
             </p>
 
             <Link
-              href="/manage/ai/worksheet?new=1"
+              href="/create/worksheet?new=1"
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
             >
               Create Your First Worksheet
@@ -565,7 +565,7 @@ export default function WorksheetsLibrary({
                         ================================================= */}
 
                       <Link
-                        href={`/manage/ai/worksheet?projectId=${encodeURIComponent(
+                        href={`/create/worksheet?projectId=${encodeURIComponent(
                           worksheet.projectId,
                         )}`}
                         className="block overflow-hidden rounded-t-xl"
@@ -595,7 +595,7 @@ export default function WorksheetsLibrary({
                         ================================================= */}
 
                       <Link
-                        href={`/manage/ai/worksheet?projectId=${encodeURIComponent(
+                        href={`/create/worksheet?projectId=${encodeURIComponent(
                           worksheet.projectId,
                         )}`}
                         className="block p-4 pr-12"

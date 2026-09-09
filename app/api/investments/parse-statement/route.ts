@@ -52,10 +52,6 @@ function normalizeMoney(value: string): string {
   return match?.[0] ?? "";
 }
 
-function isNumericValue(value: string): boolean {
-  return /^-?\$?\d[\d,]*(?:\.\d+)?$/.test(value.trim());
-}
-
 function isFullDate(value: string): boolean {
   const cleaned = value.trim();
 

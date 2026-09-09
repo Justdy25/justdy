@@ -4,10 +4,7 @@ import {
   InvestmentTransactionType,
   RegionType,
 } from "@/lib/generated/prisma/enums";
-import {
-  fidelityTypeFromAction,
-  normalizeSymbol,
-} from "./fidelity-portfolio-engine";
+import { fidelityTypeFromAction } from "./fidelity-portfolio-engine";
 
 export type ParsedFidelityRow = {
   name: string;

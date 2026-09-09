@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 
-import { Dialog, DialogContent } from "@/app/_components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/app/_components/ui/dialog";
 
 import { SigninModal } from "./SigninModal";
 import { SignupModal } from "./SignupModal";
@@ -10,20 +15,30 @@ import { SignupModal } from "./SignupModal";
 type AuthMode = "signin" | "signup";
 
 interface AuthModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   defaultMode?: AuthMode;
 }
 
 export function AuthModal({
+  children,
   open,
   onOpenChange,
   defaultMode = "signin",
 }: AuthModalProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [mode, setMode] = useState<AuthMode>(defaultMode);
 
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : internalOpen;
+
   const handleOpenChange = (nextOpen: boolean) => {
-    onOpenChange(nextOpen);
+    if (isControlled) {
+      onOpenChange?.(nextOpen);
+    } else {
+      setInternalOpen(nextOpen);
+    }
 
     if (!nextOpen) {
       setMode(defaultMode);
@@ -31,19 +46,17 @@ export function AuthModal({
   };
 
   const handleSigninSuccess = () => {
-    // Close the modal after successful authentication
-    onOpenChange(false);
-
-    // Reset back to the default mode for the next time it opens
-    setMode(defaultMode);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
+
       <DialogContent
         className="
           w-[calc(100%-2rem)]
-          max-w-120
+          max-w-[480px]
           max-h-[calc(100vh-2rem)]
           overflow-y-auto
           overflow-x-hidden

@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  Download,
-  FileText,
-  Maximize2,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { Download, FileText, X, ZoomIn, ZoomOut } from "lucide-react";
 
 import { PdfPreview } from "./PdfPreview";
 import Image from "next/image";
@@ -21,7 +14,6 @@ interface ResourcePreviewCardProps {
   isPdf: boolean;
   pdfPreviewUrl?: string | null;
   imageUrl?: string;
-  accentClass?: string;
   softClass?: string;
 }
 
@@ -32,7 +24,6 @@ export function ResourcePreviewCard({
   isPdf,
   pdfPreviewUrl,
   imageUrl,
-  accentClass = "bg-blue-500",
   softClass = "bg-blue-50",
 }: ResourcePreviewCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -104,22 +95,6 @@ export function ResourcePreviewCard({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
-
-  // ============================================================
-  // ZOOM OUT
-  // ============================================================
-
-  const zoomOut = () => {
-    setZoom((current) => Math.max(0.5, Number((current - 0.1).toFixed(1))));
-  };
-
-  // ============================================================
-  // ZOOM IN
-  // ============================================================
-
-  const zoomIn = () => {
-    setZoom((current) => Math.min(2.5, Number((current + 0.1).toFixed(1))));
-  };
 
   return (
     <>
@@ -542,6 +517,7 @@ export function ResourcePreviewCard({
             p-6
           "
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
                   alt={title}
