@@ -12,26 +12,43 @@ datasource db {
 // ==========================================
 
 model User {
-  id                   String               @id @default(cuid())
-  name                 String
-  email                String               @unique
-  emailVerified        Boolean              @default(false)
-  role                 String?              @default("Learner")
-  imageUrl             String?
-  phoneNumber          String?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  stripeCustomerId     String?              @unique
-  onboardingCompleted  Boolean              @default(false)
-  status               UserStatus           @default(Active)
-  lastLoginAt          DateTime?
-  verificationStatus   VerificationStatus   @default(Pending)
+  id                  String             @id @default(cuid())
+  name                String
+  email               String             @unique
+  emailVerified       Boolean            @default(false)
+  role                String?            @default("Learner")
+  imageUrl            String?
+  phoneNumber         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  stripeCustomerId    String?            @unique
+  onboardingCompleted Boolean            @default(false)
+  status              UserStatus         @default(Active)
+  lastLoginAt         DateTime?
+  verificationStatus  VerificationStatus @default(Pending)
+
+  // Universal capability architecture.
+  // `role` above remains temporarily for backward compatibility.
+  canLearn           Boolean @default(true)
+  canTeach           Boolean @default(false)
+  canTutor           Boolean @default(false)
+  canCreateResources Boolean @default(false)
+  canPublish         Boolean @default(false)
+  canSell            Boolean @default(false)
+  canManageChildren  Boolean @default(false)
+  canManageSchool    Boolean @default(false)
+
   subscription         Subscription?
   facilitatorProfile   FacilitatorProfile?
+  learningProfile      LearningProfile?
+  teachingProfile      TeachingProfile?
+  creatorProfile       CreatorProfile?
   accounts             Account[]
   sessions             Session[]
   products             Product[]
+  courses              Course[]
   enrollment           Enrollment[]
+  courseEnrollments    CourseEnrollment[]   @relation("CourseLearner")
   lessonProgress       LessonProgress[]
   learnerAppointments  Appointment[]        @relation("LearnerAppointments")
   educatorAppointments Appointment[]        @relation("EducatorAppointments")
@@ -47,9 +64,32 @@ model User {
   videoGenerations     VideoGeneration[]
   credits              UserCredit?
   creditTransactions   CreditTransaction[]
-  aiProjects       AIProject[]
-  aiGenerations    AIGeneration[]
-  aiAssets         AIAsset[]
+  aiProjects           AIProject[]
+  aiGenerations        AIGeneration[]
+  aiAssets             AIAsset[]
+
+  // Universal relationships and capabilities.
+  capabilities               UserCapability[]
+  permissions                UserPermission[]
+  followers                  Follow[]                 @relation("FollowedUser")
+  following                  Follow[]                 @relation("FollowingUser")
+  connectionsFrom            Connection[]             @relation("ConnectionRequester")
+  connectionsTo              Connection[]             @relation("ConnectionReceiver")
+  availabilities             Availability[]
+  studentBookings            Booking[]                @relation("StudentBookings")
+  educatorBookings           Booking[]                @relation("EducatorBookings")
+  services                   Service[]
+  organizationMemberships    OrganizationMembership[]
+  organizationOwnerships     Organization[]
+  classroomStudents          ClassroomStudent[]
+  classroomTeachers          ClassroomTeacher[]
+  familyMemberships          FamilyMember[]
+  studentProfile             StudentProfile?
+  tutoringBookingsAsCustomer TutoringBooking[]        @relation("TutoringBookingCustomer")
+  tutoringBookingsAsTutor    TutoringBooking[]        @relation("TutoringBookingTutor")
+  tutoringSlots              TutoringSlot[]
+  aiConversations            AIConversation[]
+  aiMessages                 AIMessage[]
 
   @@map("user")
 }
@@ -191,6 +231,8 @@ model Appointment {
   videoSessionToken       String?
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
+  tutoringSlotId          String?           @unique
+  tutoringSlot            TutoringSlot?     @relation(fields: [tutoringSlotId], references: [id], onDelete: SetNull)
   whiteboard              Whiteboard?
 
   @@index([status, startTime])
@@ -275,16 +317,23 @@ model Topic {
 }
 
 model Chapter {
-  id        String   @id @default(cuid())
-  title     String
-  position  Int
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  title    String
+  position Int
+
+  // A chapter can belong to the legacy downloadable Product
+  // or the newer structured Course.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
   lessons   Lesson[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([productId])
+  @@index([courseId])
 }
 
 model Lesson {
@@ -487,6 +536,7 @@ model Whiteboard {
   id            String       @id @default(cuid())
   userId        String
   appointmentId String?      @unique
+  bookingId     String?      @unique
   isStandalone  Boolean      @default(false)
   name          String       @default("Untitled Whiteboard")
   data          Json
@@ -494,6 +544,7 @@ model Whiteboard {
   updatedAt     DateTime     @updatedAt
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  booking       Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isStandalone])
@@ -544,19 +595,24 @@ model VideoGeneration {
   provider           String
   model              String?
   providerTaskId     String?
+  requestId          String?               @unique
   status             VideoGenerationStatus @default(PENDING)
   videoUrl           String?               @db.Text
   thumbnailUrl       String?               @db.Text
   creditsUsed        Int                   @default(0)
+  creditChargedAt    DateTime?
+  creditRefundedAt   DateTime?
   errorMessage       String?               @db.Text
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   completedAt        DateTime?
   creditTransactions CreditTransaction[]
+  AIMessage          AIMessage[]
 
   @@index([userId, createdAt])
   @@index([status])
   @@index([providerTaskId])
+  @@index([requestId])
   @@index([subjectId])
   @@index([topicId])
 }
@@ -572,19 +628,19 @@ model UserCredit {
 }
 
 model CreditTransaction {
-  id           String                @id @default(cuid())
-  userId       String
-  userCreditId String
-  amount       Int
-  type         CreditTransactionType
-  description  String?
-  generationId String?
+  id             String                @id @default(cuid())
+  userId         String
+  userCreditId   String
+  amount         Int
+  type           CreditTransactionType
+  description    String?
+  generationId   String?
   aiGenerationId String?
-  createdAt    DateTime              @default(now())
-  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userCredit   UserCredit            @relation(fields: [userCreditId], references: [id], onDelete: Cascade)
-  generation   VideoGeneration?      @relation(fields: [generationId], references: [id], onDelete: SetNull)
-  aiGeneration AIGeneration?         @relation(fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  createdAt      DateTime              @default(now())
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userCredit     UserCredit            @relation(fields: [userCreditId], references: [id], onDelete: Cascade)
+  generation     VideoGeneration?      @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  aiGeneration   AIGeneration?         @relation(fields: [aiGenerationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userCreditId])
@@ -594,75 +650,84 @@ model CreditTransaction {
 }
 
 model AIGeneration {
-  id             String              @id @default(cuid())
-  userId         String
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId      String?
-  project        AIProject?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  type           AIGenerationType
-  status         AIGenerationStatus  @default(PENDING)
-  prompt         String              @db.Text
-  inputData      Json?
-  outputData     Json?
-  provider       String?
-  model          String?
-  providerTaskId String?
-  creditsUsed    Int                 @default(0)
-  errorMessage   String?             @db.Text
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  assets         AIAsset[]
+  id                 String                 @id @default(cuid())
+  userId             String
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId          String?
+  project            AIProject?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  type               AIGenerationType
+  operation          AIGenerationOperation?
+  requestId          String?                @unique
+  status             AIGenerationStatus     @default(PENDING)
+  prompt             String                 @db.Text
+  inputData          Json?
+  outputData         Json?
+  provider           String?
+  model              String?
+  providerTaskId     String?
+  creditsUsed        Int                    @default(0)
+  creditOperation    AIGenerationOperation?
+  creditChargedAt    DateTime?
+  creditRefundedAt   DateTime?
+  errorMessage       String?                @db.Text
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  assets             AIAsset[]
   creditTransactions CreditTransaction[]
+  AIMessage          AIMessage[]
 
   @@index([userId, createdAt])
   @@index([projectId])
   @@index([status])
   @@index([providerTaskId])
+  @@index([userId, requestId])
 }
 
 model AIProject {
-  id          String        @id @default(cuid())
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  description String?       @db.Text
-  type        AIProjectType @default(GENERAL)
-  status      AIProjectStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  generations AIGeneration[]
-  assets      AIAsset[]
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?          @db.Text
+  type          AIProjectType    @default(GENERAL)
+  status        AIProjectStatus  @default(ACTIVE)
+  context       Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  generations   AIGeneration[]
+  assets        AIAsset[]
+  conversations AIConversation[]
 
   @@index([userId, updatedAt])
 }
 
 model AIAsset {
-  id            String        @id @default(cuid())
+  id String @id @default(cuid())
 
-  userId        String
-  projectId     String?
-  generationId  String?
+  userId       String
+  projectId    String?
+  generationId String?
 
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project       AIProject?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  generation    AIGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    AIProject?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  generation AIGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
 
-  type          AIAssetType
-  name          String
+  type AIAssetType
+  name String
 
-  fileKey       String?
-  url           String?       @db.Text
-  thumbnailUrl  String?       @db.Text
+  fileKey      String?
+  url          String? @db.Text
+  thumbnailUrl String? @db.Text
 
-  mimeType      String?
-  fileSize      Int?
+  mimeType String?
+  fileSize Int?
 
-  metadata      Json?
+  metadata Json?
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
   @@index([projectId])
@@ -670,8 +735,573 @@ model AIAsset {
 }
 
 // ==========================================
+// UNIVERSAL USER / CAPABILITY ARCHITECTURE
+// ==========================================
+
+model LearningProfile {
+  id                String      @id @default(cuid())
+  userId            String      @unique
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gradeLevel        GradeLevel?
+  schoolName        String?
+  learningGoals     String?     @db.Text
+  preferredSubjects Json?
+  interests         Json?
+  preferredLanguage String?
+  timezone          String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model TeachingProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline           String?
+  specialty          String?
+  experience         Int?
+  credentialUrl      String?
+  description        String?            @db.Text
+  verificationStatus VerificationStatus @default(Pending)
+  hourlyRate         Int?
+  currency           CurrencyType       @default(USD)
+  subjects           Json?
+  gradeLevels        Json?
+  courses            Course[]
+  services           Service[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model CreatorProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  bio         String?  @db.Text
+  specialties Json?
+  websiteUrl  String?
+  socialLinks Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Capability {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  users       UserCapability[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model UserCapability {
+  userId       String
+  capabilityId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability   Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([userId, capabilityId])
+  @@index([capabilityId])
+}
+
+model UserPermission {
+  userId     String
+  permission String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, permission])
+  @@index([permission])
+}
+
+// ==========================================
+// SOCIAL / RELATIONSHIPS
+// ==========================================
+
+model Follow {
+  followerId  String
+  followingId String
+  follower    User     @relation("FollowingUser", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowedUser", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Connection {
+  id          String           @id @default(cuid())
+  requesterId String
+  receiverId  String
+  requester   User             @relation("ConnectionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver    User             @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  status      ConnectionStatus @default(Pending)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([requesterId, receiverId])
+  @@index([receiverId, status])
+}
+
+// ==========================================
+// SERVICES / TUTORING MARKETPLACE
+// ==========================================
+
+model Service {
+  id                String           @id @default(cuid())
+  providerId        String
+  provider          User             @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  teachingProfileId String?
+  teachingProfile   TeachingProfile? @relation(fields: [teachingProfileId], references: [id], onDelete: SetNull)
+  title             String
+  description       String?          @db.Text
+  type              ServiceType      @default(TUTORING)
+  durationMinutes   Int?
+  price             Int?
+  currency          CurrencyType     @default(USD)
+  status            ServiceStatus    @default(Draft)
+  subject           String?
+  gradeLevels       Json?
+  bookings          Booking[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([providerId, status])
+  @@index([type, status])
+}
+
+model Availability {
+  id         String     @id @default(cuid())
+  educatorId String
+  educator   User       @relation(fields: [educatorId], references: [id], onDelete: Cascade)
+  startTime  DateTime
+  endTime    DateTime
+  status     SlotStatus @default(Available)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  bookings   Booking[]
+
+  @@index([educatorId, startTime])
+  @@index([status, startTime])
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  studentId         String
+  student           User          @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)
+  educatorId        String
+  educator          User          @relation("EducatorBookings", fields: [educatorId], references: [id], onDelete: Cascade)
+  serviceId         String?
+  service           Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  availabilityId    String?
+  availability      Availability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
+  startTime         DateTime
+  endTime           DateTime
+  subject           String?
+  gradeLevel        String?
+  status            BookingStatus @default(Scheduled)
+  description       String?       @db.Text
+  stripeSessionId   String?
+  paymentIntentId   String?
+  payoutStatus      PayoutStatus  @default(Unpaid)
+  videoSessionId    String?
+  videoSessionToken String?
+  whiteboard        Whiteboard?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([studentId, startTime])
+  @@index([educatorId, startTime])
+  @@index([status, startTime])
+  @@index([availabilityId])
+}
+
+// ==========================================
+// STRUCTURED COURSES
+// ==========================================
+
+model Course {
+  id                String             @id @default(cuid())
+  title             String
+  description       String             @db.Text
+  slug              String             @unique
+  smallDescription  String?
+  thumbnailKey      String?
+  price             Int?
+  duration          Int?
+  level             CourseLevel        @default(Beginner)
+  category          String?
+  status            CourseStatus       @default(Draft)
+  stripePriceId     String?            @unique
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teachingProfileId String?
+  teachingProfile   TeachingProfile?   @relation(fields: [teachingProfileId], references: [id], onDelete: SetNull)
+  chapters          Chapter[]
+  enrollments       CourseEnrollment[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([teachingProfileId])
+}
+
+model CourseEnrollment {
+  id        String                 @id @default(cuid())
+  courseId  String
+  course    Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  learnerId String
+  learner   User                   @relation("CourseLearner", fields: [learnerId], references: [id], onDelete: Cascade)
+  amount    Int?
+  status    CourseEnrollmentStatus @default(Pending)
+  progress  Float                  @default(0)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@unique([courseId, learnerId])
+  @@index([learnerId, status])
+}
+
+// ==========================================
+// ORGANIZATIONS / SCHOOLS FOUNDATION
+// ==========================================
+
+model Organization {
+  id          String                   @id @default(cuid())
+  name        String
+  slug        String                   @unique
+  type        OrganizationType         @default(SCHOOL)
+  description String?
+  logoUrl     String?
+  websiteUrl  String?
+  status      OrganizationStatus       @default(ACTIVE)
+  ownerId     String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  classrooms  Classroom[]
+  owner       User?                    @relation(fields: [ownerId], references: [id])
+  memberships OrganizationMembership[]
+
+  @@index([ownerId])
+  @@index([type, status])
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+model Classroom {
+  id             String             @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  gradeLevel     String?
+  subject        String?
+  schoolYear     String?
+  status         ClassroomStatus    @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  students       ClassroomStudent[]
+  teachers       ClassroomTeacher[]
+
+  @@index([organizationId, gradeLevel])
+  @@index([organizationId, status])
+  @@index([organizationId, subject])
+}
+
+model ClassroomStudent {
+  classroomId String
+  userId      String
+  joinedAt    DateTime  @default(now())
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([classroomId, userId])
+  @@index([userId])
+}
+
+model ClassroomTeacher {
+  classroomId String
+  userId      String
+  isPrimary   Boolean   @default(false)
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([classroomId, userId])
+  @@index([userId])
+}
+
+model Family {
+  id        String         @id @default(cuid())
+  name      String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  members   FamilyMember[]
+}
+
+model FamilyMember {
+  familyId String
+  userId   String
+  role     FamilyRole
+  joinedAt DateTime   @default(now())
+  family   Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([familyId, userId])
+  @@index([familyId, role])
+  @@index([userId])
+}
+
+model StudentProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  gradeLevel    String?
+  bio           String?
+  learningStyle String?
+  preferredPace String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([gradeLevel])
+}
+
+model TutoringBooking {
+  id                   String                @id @default(cuid())
+  customerId           String
+  tutorId              String
+  tutoringSlotId       String                @unique
+  subject              String
+  gradeLevel           String
+  topic                String?
+  description          String?
+  amount               Int
+  currency             String                @default("usd")
+  status               TutoringBookingStatus @default(PENDING_PAYMENT)
+  stripeSessionId      String?               @unique
+  paymentIntentId      String?
+  stripeSubscriptionId String?
+  appointmentId        String?               @unique
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customer             User                  @relation("TutoringBookingCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  tutor                User                  @relation("TutoringBookingTutor", fields: [tutorId], references: [id], onDelete: Cascade)
+  tutoringSlot         TutoringSlot          @relation(fields: [tutoringSlotId], references: [id])
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@index([tutorId, createdAt])
+  @@index([tutorId, status])
+}
+
+model TutoringSlot {
+  id              String           @id @default(cuid())
+  tutorId         String
+  startTime       DateTime
+  endTime         DateTime
+  status          SlotStatus       @default(Available)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointment     Appointment?
+  tutoringBooking TutoringBooking?
+  tutor           User             @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@unique([tutorId, startTime, endTime])
+  @@index([tutorId, startTime])
+  @@index([tutorId, status, startTime])
+}
+
+model AIRateLimitBucket {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  windowStart  DateTime
+  requestCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([windowStart])
+}
+
+model AIConversation {
+  id              String               @id @default(cuid())
+  userId          String
+  projectId       String?
+  title           String               @default("New Chat")
+  model           String?
+  status          AIConversationStatus @default(ACTIVE)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  activeMessageId String?
+  metadata        Json?
+  activeMessage   AIMessage?           @relation("AIConversationActiveMessage", fields: [activeMessageId], references: [id])
+  project         AIProject?           @relation(fields: [projectId], references: [id])
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        AIMessage[]          @relation("AIConversationMessages")
+
+  @@index([activeMessageId])
+  @@index([projectId])
+  @@index([userId, status])
+  @@index([userId, updatedAt])
+}
+
+model AIMessage {
+  id                String           @id @default(cuid())
+  conversationId    String
+  userId            String
+  role              AIMessageRole
+  content           String
+  attachments       Json?
+  metadata          Json?
+  generationId      String?
+  createdAt         DateTime         @default(now())
+  parentMessageId   String?
+  videoGenerationId String?
+  conversation      AIConversation   @relation("AIConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  activeIn          AIConversation[] @relation("AIConversationActiveMessage")
+  generation        AIGeneration?    @relation(fields: [generationId], references: [id])
+  parent            AIMessage?       @relation("AIMessageParent", fields: [parentMessageId], references: [id])
+  children          AIMessage[]      @relation("AIMessageParent")
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoGeneration   VideoGeneration? @relation(fields: [videoGenerationId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([generationId])
+  @@index([parentMessageId])
+  @@index([userId, createdAt])
+  @@index([videoGenerationId])
+}
+
+// ==========================================
 // ENUMS
 // ==========================================
+
+enum AIConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum ClassroomStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum FamilyRole {
+  PARENT
+  GUARDIAN
+  CHILD
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  LEFT
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum OrganizationType {
+  SCHOOL
+  DISTRICT
+  TUTORING_CENTER
+  HOMESCHOOL
+  EDUCATIONAL_INSTITUTION
+  OTHER
+}
+
+enum TutoringBookingStatus {
+  PENDING_PAYMENT
+  PAID
+  SCHEDULED
+  READY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  REFUNDED
+}
+
+enum ConnectionStatus {
+  Pending
+  Accepted
+  Rejected
+  Blocked
+}
+
+enum ServiceType {
+  TUTORING
+  GROUP_CLASS
+  COURSE
+  CONSULTATION
+  OTHER
+}
+
+enum ServiceStatus {
+  Draft
+  Published
+  Archived
+}
+
+enum BookingStatus {
+  Scheduled
+  PendingPayment
+  Completed
+  Cancelled
+  NoShow
+}
+
+enum CourseLevel {
+  Beginner
+  Intermediate
+  Advanced
+}
+
+enum CourseStatus {
+  Draft
+  Published
+  Archived
+}
+
+enum CourseEnrollmentStatus {
+  Pending
+  Active
+  Completed
+  Cancelled
+}
+
+enum OrganizationRole {
+  Owner
+  Admin
+  Educator
+  Member
+}
 
 enum InvestmentTransactionType {
   BUY
@@ -852,6 +1482,19 @@ enum CreditTransactionType {
   ADJUSTMENT
 }
 
+enum AIGenerationOperation {
+  CHAT
+  RESEARCH
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  WORKSHEET
+  QUIZ
+  LESSON_PLAN
+  PRESENTATION
+}
+
 enum AIGenerationType {
   TEXT
   IMAGE
@@ -901,6 +1544,7 @@ enum AIProjectStatus {
   ARCHIVED
   DELETED
 }
+
 enum AIPlanType {
   FREE
   CREATOR
